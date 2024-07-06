@@ -1,0 +1,23 @@
+# [[watches]]
+# pattern = "foo"
+# regex = false
+#
+# [[watches.commands]]
+# # lifetime = {not_seen = "3m"}
+# condition = {seen = "5s"}
+# exec = ["sh", "-c", "notify-end action!"]
+##run_once = false # run the command only once
+
+[[profiles]]
+pattern = "bar"
+regex = false
+
+[[profiles.commands]]
+# lifetime = {not_seen = "3m"}
+condition = {not_seen = "5s"}
+
+# one off command
+exec = ["sh", "-c", "echo not seen !"]
+
+# when exec_end is defined the schedule behaves like a toggle
+# exec_end

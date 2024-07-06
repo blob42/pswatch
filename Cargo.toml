@@ -1,0 +1,23 @@
+[package]
+name = "pswatch"
+version = "0.1.0"
+edition = "2021"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.0.23", features = ["derive"] }
+dirs = "5.0.1"
+env_logger = "0.11.3"
+humantime-serde = "1.1.1"
+log = "0.4.22"
+mock_instant = "0.5.1"
+regex = "1.10.5"
+sd-notify = "0.4.2"
+serde = { version = "1.0.203", features = ["derive"] }
+sysinfo = "0.30.12"
+toml = "0.8.14"
+xdg = "2.5.2"
+
