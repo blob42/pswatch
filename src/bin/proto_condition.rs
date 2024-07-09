@@ -3,6 +3,7 @@
 use std::{marker::PhantomData, time::{Duration, Instant}};
 use sysinfo::System;
 
+
 #[derive(Debug)]
 enum ProcState {
     NeverSeen,
@@ -18,6 +19,7 @@ struct Process {
     prev_state: Option<ProcState>,
     pid: Option<usize>,
 }
+
 
 impl Process {
     fn new() -> Self {
@@ -35,26 +37,52 @@ impl Process {
     }
 }
 
-impl Matcher<ConditionSeen> for Process {
-    type Condition = LifetimeCond<ConditionSeen>;
+impl Matcher<Seen> for Process {
+    type Condition = LifetimeCond<Seen>;
 
     fn matches(&self, c: Self::Condition) -> bool {
+        if !matches!(self.state, ProcState::Seen) { return false };
+        if let Some(first_seen) = self.first_seen {
+            first_seen.elapsed() > c.span
+        } else { false }
+    }
+}
+
+impl Matcher<NotSeen> for Process {
+    type Condition = LifetimeCond<NotSeen>;
+
+    fn matches(&self, c: Self::Condition) -> bool {
+        if !matches!(self.state, ProcState::NotSeen | ProcState::NeverSeen) { return false };
         if let Some(last_seen) = self.last_seen {
             last_seen.elapsed() > c.span
         } else { false }
     }
 }
 
+impl<T> ProcessMatcher<T> for Process where Process: Matcher<T>  {
+    fn matches_exe(&self, process: &sysinfo::Process) -> bool {
+        // if let Some(exe) = process.exe().and_then(|c| c.to_str()) {
+        //     exe.contains(&self.conf.pattern)
+        // } else {
+        //     false
+        // }
+        todo!()
+    }
 
-struct ConditionSeen {}
-impl ConditionSeen {
+    fn matches_cmdline(&self, process: &sysinfo::Process) -> bool {
+        todo!()
+    }
+}
+
+struct Seen {}
+impl Seen {
     fn from_duration(d: Duration) -> LifetimeCond<Self> {
         LifetimeCond{span: d, ty: PhantomData{}}
     }
 }
 
-struct ConditionNotSeen {}
-impl ConditionNotSeen {
+struct NotSeen {}
+impl NotSeen {
     fn from_duration(d: Duration) -> LifetimeCond<Self> {
         LifetimeCond{span: d, ty: PhantomData{}}
     }
@@ -76,10 +104,15 @@ impl<T> LifetimeCond<T> {
 
 
 
-trait Matcher<CondType> {
-    type Condition: Condition<CondType>;
+trait Matcher<T> {
+    type Condition: Condition<T>;
 
     fn matches(&self, c: Self::Condition) -> bool;
+}
+
+trait ProcessMatcher<T>: Matcher<T> {
+    fn matches_exe(&self, process: &sysinfo::Process) -> bool;
+    fn matches_cmdline(&self, process: &sysinfo::Process) -> bool;
 }
 
 
@@ -94,8 +127,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn process_watch_condition() {
-        let cond = ConditionSeen::from_duration(Duration::from_secs(5));
+    fn process_seen() {
+        let cond = Seen::from_duration(Duration::from_secs(5));
 
         let process_refresh_kind = ProcessRefreshKind::new()
             .with_cmd(UpdateKind::Always)
@@ -108,6 +141,6 @@ mod test {
 
         let mut p = Process::new();
         p.refresh(&sys_info, Instant::now());
-        assert!(!p.matches(cond));
+        assert!(!Matcher::<Seen>::matches(&p, cond));
     }
 }
