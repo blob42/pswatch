@@ -88,8 +88,27 @@ impl NotSeen {
     }
 }
 
+
+enum ProcLifetime {
+    Seen,
+    NotSeen
+}
+
+impl Matcher<ProcLifetime> for Process {
+    type Condition = ProcLifetime;
+
+    fn matches(&self, c: Self::Condition) -> bool {
+        match c {
+            ProcLifetime::Seen => todo!(),
+            ProcLifetime::NotSeen => todo!(),
+        }
+    }
+}
+
+
 trait Condition<Type> {}
 impl<T> Condition<T> for LifetimeCond<T>{}
+impl<T> Condition<T> for ProcLifetime{}
 
 struct LifetimeCond<CondType> {
     span: Duration,
