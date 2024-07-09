@@ -44,7 +44,7 @@ use sysinfo::{Pid, Process, ProcessRefreshKind, RefreshKind, System, UpdateKind}
 
 use crate::{config::Config, utils::debug_process};
 
-pub(crate) use process::{ProcCondition, ProcessWatch, ProcessWatchConfig};
+pub(crate) use process::{ProcState, ProcessWatch, ProcessWatchConfig};
 
 mod process;
 
@@ -56,7 +56,7 @@ pub const SAMPLING_RATE: Duration = Duration::from_secs(5);
 #[derive(Debug, Deserialize, Clone)]
 pub struct CmdSchedule {
     /// The condition under which the command should be executed.
-    condition: ProcCondition,
+    condition: ProcState,
 
     /// The list of commands to execute. Currently marked as TODO; consider replacing with an Action enum for better type control.
     exec: Vec<String>,

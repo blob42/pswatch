@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 
+[[bin]]
+name = "condition"
+path = "src/bin/proto_condition.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -12,6 +16,7 @@ clap = { version = "4.0.23", features = ["derive"] }
 dirs = "5.0.1"
 env_logger = "0.11.3"
 humantime-serde = "1.1.1"
+indoc = "2.0.5"
 log = "0.4.22"
 mock_instant = "0.5.1"
 regex = "1.10.5"

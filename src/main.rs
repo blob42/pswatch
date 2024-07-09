@@ -55,7 +55,6 @@ fn watch() {
     }
 }
 fn main() -> anyhow::Result<()> {
-    // env_logger::init();
     let _ = sd_notify::notify(true, &[NotifyState::Ready]);
     let cli = Cli::parse();
 
@@ -81,6 +80,7 @@ fn main() -> anyhow::Result<()> {
     let program_cfg = read_config(cli.config).context("missing config file")?;
 
     let mut scheduler = Scheduler::new(&program_cfg.profiles);
+    //TODO: own thread
     scheduler.watch();
     Ok(())
 }

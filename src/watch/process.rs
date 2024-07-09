@@ -146,7 +146,7 @@ impl ProcessWatch {
 
 /// User defined condition on a Process
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) enum ProcCondition {
+pub(crate) enum ProcState {
     #[serde(rename = "seen", with = "humantime_serde")]
     Seen(Duration),
 
@@ -155,7 +155,7 @@ pub(crate) enum ProcCondition {
     //TODO: resource management: ram, cpu, IO ...
 }
 
-impl ProcCondition {
+impl ProcState {
     fn duration(self) -> Duration {
         match self {
             Self::Seen(d) => d,
@@ -259,13 +259,13 @@ impl ProcessState {
         *self = Self::NotSeen(inst);
     }
 
-    fn update(&mut self, cond: ProcCondition, detected: bool, last_refresh: Instant) -> Action {
+    fn update(&mut self, cond: ProcState, detected: bool, last_refresh: Instant) -> Action {
         match self {
             ProcessState::Seen(since) => {
                 match cond {
                     // COND SEEN
                     // process already detected AND still running
-                    ProcCondition::Seen(duration) if detected => {
+                    ProcState::Seen(duration) if detected => {
                         let elapsed = since.elapsed().as_secs();
                         debug!("process running since {elapsed}s");
                         if self.seen_since().unwrap() > duration {
@@ -278,18 +278,18 @@ impl ProcessState {
                         debug!("process disappread");
                         self.unsee(last_refresh);
                     }
-                    ProcCondition::NotSeen(duration) if detected => {}
-                    ProcCondition::NotSeen(duration) if !detected => {}
-                    ProcCondition::Seen(_) => {
+                    ProcState::NotSeen(duration) if detected => {}
+                    ProcState::NotSeen(duration) if !detected => {}
+                    ProcState::Seen(_) => {
                         unreachable!()
                     }
-                    ProcCondition::NotSeen(_) => {
+                    ProcState::NotSeen(_) => {
                         unreachable!()
                     }
                 }
             }
             ProcessState::NotSeen(since) | ProcessState::NeverSeen { t: since } => match cond {
-                ProcCondition::NotSeen(duration) if !detected => {
+                ProcState::NotSeen(duration) if !detected => {
                     let elapsed_since = since.elapsed();
                     debug!("process absent for {elapsed_since:?}");
                     if elapsed_since > duration {
@@ -298,8 +298,8 @@ impl ProcessState {
                     }
                 }
                 _ if detected => self.see(last_refresh),
-                ProcCondition::Seen(_) => {}
-                ProcCondition::NotSeen(_) => {}
+                ProcState::Seen(_) => {}
+                ProcState::NotSeen(_) => {}
             }, //
                //     if matches!(cond, ProcCondition::Seen(_))
                //         && matches!(ev, Event::Detected(_)) =>
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn cond_seen_since() {
-        let cond_seen = ProcCondition::Seen(Duration::from_secs(5));
+        let cond_seen = ProcState::Seen(Duration::from_secs(5));
         let mut proc_state = ProcessState::new();
         let mut last_refresh = Instant::now();
 
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn cond_not_seen_since() {
-        let cond_not_seen = ProcCondition::NotSeen(Duration::from_secs(5));
+        let cond_not_seen = ProcState::NotSeen(Duration::from_secs(5));
         let mut proc_state = ProcessState::new();
         let mut last_refresh = Instant::now();
         let detected = true;
