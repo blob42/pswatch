@@ -288,6 +288,7 @@ impl ProcessState {
                     }
                 }
             }
+            //HACK: the `t` field on NeverSeen is only used to make this match pattern work
             ProcessState::NotSeen(since) | ProcessState::NeverSeen { t: since } => match cond {
                 ProcState::NotSeen(duration) if !detected => {
                     let elapsed_since = since.elapsed();
