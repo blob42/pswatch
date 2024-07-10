@@ -3,12 +3,12 @@ use std::{fs, path::PathBuf};
 use anyhow::{bail, Context};
 use serde::Deserialize;
 
-use crate::watch::ProcessWatchConfig;
+use crate::watch::Profile;
 
 /// Main config for project. It is loaded from TOML or YAML in that order
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub profiles: Vec<ProcessWatchConfig>,
+    pub profiles: Vec<Profile>,
 }
 
 fn parse_config(content: &str) -> anyhow::Result<Config> {

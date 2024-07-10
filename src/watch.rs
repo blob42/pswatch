@@ -44,7 +44,7 @@ use sysinfo::{Pid, Process, ProcessRefreshKind, RefreshKind, System, UpdateKind}
 
 use crate::{config::Config, utils::debug_process};
 
-pub(crate) use process::{ProcState, ProcessWatch, ProcessWatchConfig};
+pub(crate) use process::{ProcState, ProcessWatch, Profile};
 
 mod process;
 
@@ -84,7 +84,7 @@ pub struct Scheduler {
 impl Scheduler {
     const SAMPLING_RATE: Duration = Duration::from_secs(3);
 
-    pub fn new(watches: &[ProcessWatchConfig]) -> Self {
+    pub fn new(watches: &[Profile]) -> Self {
         let process_refresh_kind = ProcessRefreshKind::new()
             .with_cmd(UpdateKind::Always)
             .with_cwd(UpdateKind::Always)

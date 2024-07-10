@@ -26,12 +26,12 @@ use crate::{config::Config, utils::debug_process};
 use super::CmdSchedule;
 
 pub(crate) struct ProcessWatch {
-    conf: ProcessWatchConfig,
+    conf: Profile,
     state: ProcessState,
 }
 
 impl ProcessWatch {
-    pub fn new(conf: ProcessWatchConfig) -> Self {
+    pub fn new(conf: Profile) -> Self {
         Self {
             conf,
             state: ProcessState::new(),
@@ -165,7 +165,7 @@ impl ProcState {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) struct ProcessWatchConfig {
+pub(crate) struct Profile {
     /// pattern of process name to match against
     pub pattern: String,
 

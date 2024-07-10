@@ -7,13 +7,11 @@ pub mod matching {
 
     pub trait Condition {}
 
-    pub trait Matcher<T> 
-        where
-            {
-                type Condition;
+    pub trait Matcher {
+        type Condition;
 
-                fn matches(&self, c: Self::Condition) -> bool;
-            }
+        fn matches(&self, c: Self::Condition) -> bool;
+    }
 
 }
 
