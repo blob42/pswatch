@@ -2,7 +2,20 @@
 #![allow(unused_variables)]
 
 pub mod process;
-pub mod matching;
+
+pub mod matching {
+
+    pub trait Condition {}
+
+    pub trait Matcher<T> 
+        where
+            {
+                type Condition;
+
+                fn matches(&self, c: Self::Condition) -> bool;
+            }
+
+}
 
 pub mod watch {
     use serde::Deserialize;
