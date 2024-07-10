@@ -3,7 +3,6 @@
 //! the presence or absence of certain processes in your system.
 
 #![allow(dead_code, unused_variables, unused_imports)]
-mod config;
 mod utils;
 mod watch;
 
@@ -17,10 +16,10 @@ use std::{
 
 use anyhow::{bail, Context};
 use clap::Parser;
-use config::read_config;
+use pswatch::{config, sched::Scheduler};
 use sd_notify::{notify, NotifyState};
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
-use watch::Scheduler;
+
 
 /// Watch and run commands on matching processes
 ///
@@ -38,22 +37,6 @@ struct Cli {
     debug: u8,
 }
 
-fn watch() {
-    let process_refresh = RefreshKind::new().with_processes(
-        ProcessRefreshKind::everything()
-            .without_environ()
-            .without_disk_usage(),
-    );
-    let mut sys = System::new();
-
-    loop {
-        sys.refresh_specifics(process_refresh);
-        sys.processes().iter().take(1).for_each(|(pid, proc)| {
-            println!("{} -> {:?}", pid, proc);
-        });
-        sleep(Duration::from_secs(5))
-    }
-}
 fn main() -> anyhow::Result<()> {
     let _ = sd_notify::notify(true, &[NotifyState::Ready]);
     let cli = Cli::parse();
@@ -77,10 +60,10 @@ fn main() -> anyhow::Result<()> {
     }
     logger.init();
 
-    let program_cfg = read_config(cli.config).context("missing config file")?;
+    let program_cfg = config::read_config(cli.config).context("missing config file")?;
 
-    let mut scheduler = Scheduler::new(&program_cfg.profiles);
+    let mut scheduler = Scheduler::new(program_cfg.profiles);
     //TODO: own thread
-    scheduler.watch();
+    scheduler.run();
     Ok(())
 }

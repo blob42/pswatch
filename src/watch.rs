@@ -24,8 +24,6 @@
 //! # Constants
 //! - `SAMPLING_RATE`: The global sampling rate in seconds used for scheduling tasks.
 //!
-//! # Types
-//! - `SysProcess`: A type alias for a hashmap containing process information.
 //!
 //! # Modules
 //! - `process`: Contains the definition and implementation of `ProcessWatch`, `ProcCondition`, and `ProcessWatchConfig`.
@@ -73,7 +71,6 @@ pub struct CmdSchedule {
     disabled: bool,
 }
 
-type SysProcess = HashMap<Pid, Process>;
 
 pub struct Scheduler {
     refresh_type: RefreshKind,

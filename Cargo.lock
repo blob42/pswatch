@@ -347,6 +347,7 @@ dependencies = [
  "humantime-serde",
  "indoc",
  "log",
+ "memchr",
  "mock_instant",
  "regex",
  "sd-notify",

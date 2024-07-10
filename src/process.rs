@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
-use std::{borrow::Borrow, time::Duration};
+use std::{borrow::Borrow, os::unix::ffi::OsStrExt, time::Duration};
 
 use super::matching::*;
 use log::debug;
+use memchr;
 use serde::Deserialize;
 use sysinfo::System;
 
@@ -11,14 +12,11 @@ use sysinfo::System;
 use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq)]
-enum ProcState {
+pub enum ProcState {
     NeverSeen,
     Seen,
     NotSeen,
 }
-
-
-impl Condition for ProcCondition {}
 
 /// User defined condition on a Process
 #[derive(Debug, Deserialize, Clone)]
@@ -67,32 +65,68 @@ impl Process {
 
     pub fn refresh(&mut self, sysinfo: &System, last_refresh: Instant) {
         let processes: Vec<_> = sysinfo.processes_by_name(&self.pattern).collect();
+        self.pids = processes
+            .iter()
+            .map(|p| p.pid().into())
+            .collect::<Vec<usize>>();
         self.last_refresh = Some(last_refresh);
         match processes.len() {
             0 => {
                 // no change if process still never seen
                 if !matches!(self.state, ProcState::NeverSeen) {
-                    self.prev_state = Some(ProcState::NeverSeen);
+                    self.prev_state = Some(self.state.clone());
                     self.state = ProcState::NotSeen;
-                    self.pids = vec![];
+                    debug!("<{}>: process disappread", self.pattern);
                 } else {
                     self.prev_state = Some(ProcState::NeverSeen);
+                    debug!("<{}>: never seen so far", self.pattern);
                 }
             }
-            // process detected
+
+            // process found
             _ => {
                 if self.prev_state.is_none() {
                     self.first_seen = Some(last_refresh);
+                    debug!("<{}>: process seen first time", self.pattern);
+                } else {
+                    debug!("<{}>: process reappeared", self.pattern);
                 }
                 self.prev_state = Some(self.state.clone());
                 self.state = ProcState::Seen;
                 self.last_seen = Some(last_refresh);
-                self.pids = processes
-                    .into_iter()
-                    .map(|p| p.pid().into())
-                    .collect::<Vec<usize>>();
             }
         }
+    }
+
+    /// matches processes on the full path to the executable
+    fn matches_exe(&self, info: &sysinfo::System) -> bool {
+        info.processes().values().filter_map(|proc| {
+            let finder = memchr::memmem::Finder::new(&self.pattern);
+            proc.exe().and_then(|exe_name| finder.find(exe_name.as_os_str().as_bytes()))
+        }).next().is_some()
+    }
+
+    /// matches processes on the full command line
+    fn matches_cmdline(&self, info: &sysinfo::System) -> bool {
+        info.processes().values().filter_map(|proc| {
+            let finder = memchr::memmem::Finder::new(&self.pattern);
+            finder.find(proc.cmd().join(" ").as_bytes())
+        }).next().is_some()
+    }
+
+    /// matches processes the command name only
+    fn matches_name(&self, info: &sysinfo::System) -> bool {
+        info.processes_by_name(&self.pattern).next().is_some()
+
+    }
+
+    fn matches_pattern(&self, info: &sysinfo::System, match_by: ProcessMatchBy) -> bool {
+        match match_by {
+            ProcessMatchBy::ExePath => {self.matches_exe(info) }
+            ProcessMatchBy::Cmdline => {self.matches_cmdline(info)}
+            ProcessMatchBy::Name => {self.matches_name(info)},
+        }
+
     }
 }
 
@@ -129,42 +163,12 @@ impl Matcher for Process {
     }
 }
 
-// impl Matcher<NotSeen> for Process {
-//     type Condition = ProcLifetime<NotSeen>;
-//
-//     fn matches(&self, c: Self::Condition) -> bool {
-//         if !matches!(self.state, ProcState::NotSeen | ProcState::NeverSeen) {
-//             return false;
-//         };
-//         if let Some(last_seen) = self.last_seen {
-//             last_seen.elapsed() > c.span
-//         } else {
-//             false
-//         }
-//     }
-// }
 
-// trait ProcessMatcher<T>: Matcher<T> {
-//     fn matches_exe(&self, process: &sysinfo::Process) -> bool;
-//     fn matches_cmdline(&self, process: &sysinfo::Process) -> bool;
-// }
-//
-// impl<T> ProcessMatcher<T> for Process
-// where
-//     Process: Matcher<T>,
-// {
-//     fn matches_exe(&self, process: &sysinfo::Process) -> bool {
-//         if let Some(exe) = process.exe().and_then(|c| c.to_str()) {
-//             exe.contains(&self.pattern)
-//         } else {
-//             false
-//         }
-//     }
-//
-//     fn matches_cmdline(&self, process: &sysinfo::Process) -> bool {
-//         return process.name().contains(&self.pattern);
-//     }
-// }
+enum ProcessMatchBy {
+    ExePath,
+    Cmdline,
+    Name
+}
 
 
 
@@ -173,7 +177,6 @@ use mock_instant::global::Instant;
 mod test {
     use mock_instant::global::MockClock;
     use sysinfo::{ProcessRefreshKind, RefreshKind, UpdateKind};
-
     use super::*;
 
     #[test]
@@ -184,9 +187,56 @@ mod test {
     } 
 
     #[test]
-    fn name() {
-        todo!();
+    fn match_pattern() -> anyhow::Result<(), std::io::Error> {
+        let mut p = std::process::Command::new("tests/5382952proc.sh")
+            .arg("300")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+
+
+        p.kill()
     }
+
+    // #[test]
+    // fn cond_seen_since() {
+    //     let cond_seen = ProcState::Seen(Duration::from_secs(5));
+    //     let mut proc_state = ProcessState::new();
+    //     let mut last_refresh = Instant::now();
+    //
+    //     let detected = true;
+    //
+    //     // no process detected
+    //     let mut action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
+    //     assert!(matches!(action, Action::None));
+    //
+    //     // process detected
+    //     _ = proc_state.update(cond_seen.clone(), detected, last_refresh);
+    //     assert!(matches!(proc_state, ProcessState::Seen(n) if n == last_refresh));
+    //
+    //     // process exceeded condition
+    //     MockClock::advance(Duration::from_secs(6));
+    //     last_refresh = Instant::now();
+    //     action = proc_state.update(cond_seen.clone(), detected, last_refresh);
+    //     assert!(matches!(action, Action::Run));
+    //
+    //     // process disappread
+    //     MockClock::advance(Duration::from_secs(2));
+    //     last_refresh = Instant::now();
+    //     action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
+    //     assert!(matches!(proc_state, ProcessState::NotSeen(_)));
+    //     assert!(proc_state.not_seen_since().unwrap() == last_refresh.elapsed());
+    //     assert!(matches!(action, Action::None));
+    //
+    //     // process not seen
+    //     MockClock::advance(Duration::from_secs(5));
+    //     last_refresh = Instant::now();
+    //     action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
+    //     assert!(proc_state.not_seen_since().unwrap() == Duration::from_secs(5));
+    //     assert!(matches!(action, Action::None));
+    // }
 
     // #[test]
     // fn test_not_seen_since() {
@@ -223,7 +273,7 @@ mod test {
     //
     //     assert!(
     //         matches!(proc_state, ProcessState::Seen(_)),
-    //         "process detected but state is {} ",
+    //         "process found but state is {} ",
     //         proc_state
     //     );
     //     assert!(proc_state.seen_since().unwrap() == last_refresh.elapsed());
@@ -231,13 +281,13 @@ mod test {
     //     // Advance time to ensure the process is not seen anymore.
     //     MockClock::advance(Duration::from_secs(1));
     //     last_refresh = Instant::now();
-    //     proc_state.update(cond_not_seen.clone(), !detected, last_refresh);
+    //     proc_state.update(cond_not_seen.clone(), !found, last_refresh);
     //     assert!(matches!(proc_state, ProcessState::NotSeen(_)));
     //
     //     // Process now exceeded the absent limit
     //     MockClock::advance(Duration::from_secs(6));
     //     last_refresh = Instant::now();
-    //     let action = proc_state.update(cond_not_seen.clone(), !detected, last_refresh);
+    //     let action = proc_state.update(cond_not_seen.clone(), !found, last_refresh);
     //     assert!(matches!(action, Action::Run));
     //     }
 }

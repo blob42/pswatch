@@ -1,9 +1,10 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::Duration};
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use serde::Deserialize;
 
-use crate::watch::Profile;
+use crate::sched::Profile;
+
 
 /// Main config for project. It is loaded from TOML or YAML in that order
 #[derive(Debug, Deserialize)]
@@ -11,11 +12,12 @@ pub struct Config {
     pub profiles: Vec<Profile>,
 }
 
+
 fn parse_config(content: &str) -> anyhow::Result<Config> {
     Ok(toml::from_str(content)?)
 }
 
-pub(crate) fn read_config(p: Option<PathBuf>) -> anyhow::Result<Config> {
+pub fn read_config(p: Option<PathBuf>) -> anyhow::Result<Config> {
     let cfg_file = p.unwrap_or(
         xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"))
             .with_context(|| "could not find config dir")?

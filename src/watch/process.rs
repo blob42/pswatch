@@ -176,6 +176,9 @@ pub(crate) struct Profile {
     /// Interpret `pattern` as regex
     pub regex: bool,
 
+    //TODO:
+    // pub match_by: 
+
     /// process watch sampling rate
     #[serde(default = "default_watch_interval", with = "humantime_serde")]
     pub interval: Duration,
