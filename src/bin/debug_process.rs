@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{thread, time::Duration};
 
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};

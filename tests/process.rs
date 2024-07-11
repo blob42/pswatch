@@ -1,93 +1,71 @@
 use std::time::{Duration, Instant};
 
-use pswatch::{matching::Matcher, process::{self, ProcCondition}};
-use sysinfo::{RefreshKind, UpdateKind};
-use sysinfo::ProcessRefreshKind;
+use pswatch::{process::{self, ProcCondition}, sched::Scheduler};
+use sysinfo::System;
 
-// filtered sysinfo for processes 
-struct ProcSysinfo {
-    sys: sysinfo::System,
-    ref_kind: sysinfo::RefreshKind,
-
-}
-
-impl ProcSysinfo {
-    fn new() -> Self {
-    let process_refresh_kind = ProcessRefreshKind::new()
-        .with_cmd(UpdateKind::Always)
-        .with_cwd(UpdateKind::Always)
-        .with_exe(UpdateKind::Always);
-    let process_refresh = RefreshKind::new().with_processes(process_refresh_kind);
-
-        Self { sys: sysinfo::System::new(), ref_kind: process_refresh }
-    }
-
-    fn refresh(&mut self) {
-        self.sys.refresh_specifics(self.ref_kind)
-    }
-}
 
 #[test]
 // cond: seen for 200ms
 // start state: seen
 // test state: seen for 400ms
-fn match_substring_cond_seen() {
+//FIX:
+fn match_cond_seen() {
     let cond_span = Duration::from_millis(200);
     let test_span = Duration::from_millis(400);
-    let mut s = ProcSysinfo::new();
-    let p = std::process::Command::new("sleep")
-        .arg("358591456")
+    let mut s = System::new();
+    let mut target = std::process::Command::new("tests/5382952proc.sh")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
 
     std::thread::sleep(std::time::Duration::from_secs(1));
-    s.refresh();
+    s.refresh_specifics(Scheduler::process_refresh_specs());
+
     // process exists
-    assert!(s.sys.process((p.id() as usize).into()).is_some());
+    assert!(s.process((target.id() as usize).into()).is_some());
 
 
-    let pat = "358591";
+    let pat = "538295";
     let mut p = process::Process::from_pattern(pat.into());
-    s.refresh();
-    p.refresh(&s.sys, Instant::now());
+    p.refresh(&s, Instant::now());
+    dbg!(&p);
 
-    // cond: seen for 1+ sec 
     let cond = ProcCondition::Seen(cond_span);
 
     std::thread::sleep(test_span);
 
-    s.refresh();
-    p.refresh(&s.sys, Instant::now());
+    s.refresh_specifics(Scheduler::process_refresh_specs());
+    p.refresh(&s, Instant::now());
 
     // process exceeded cond
     assert!(p.matches(cond), "process should be seen");
+    let _ = target.kill();
 }
 
 #[test]
 // cond: not seen for 400ms
 // start state: never seen
 // test state: never seen for 1s
-fn match_substring_cond_not_seen() {
+fn match_cond_not_seen() {
     let cond_span = Duration::from_millis(400);
     let test_span = Duration::from_millis(100);
-    let mut s = ProcSysinfo::new();
-    s.refresh();
+    let mut s = System::new();
+    s.refresh_specifics(Scheduler::process_refresh_specs());
     let cond = ProcCondition::NotSeen(cond_span);
 
 
 
     let pat = "4hxHtngjjkXbA9XJtl9nrs/0kxqjvXnFK79Q8iUzWXo=";
     let mut p = process::Process::from_pattern(pat.into());
-    s.refresh();
+    s.refresh_specifics(Scheduler::process_refresh_specs());
     let t1 = Instant::now();
-    p.refresh(&s.sys, t1);
+    p.refresh(&s, t1);
 
 
     std::thread::sleep(test_span);
 
-    s.refresh();
-    p.refresh(&s.sys, Instant::now());
+    s.refresh_specifics(Scheduler::process_refresh_specs());
+    p.refresh(&s, Instant::now());
 
     // process exceeded cond
     let d = t1.elapsed().as_millis();
@@ -100,26 +78,26 @@ fn match_substring_cond_not_seen() {
 // cond: not seen for 400ms
 // start state: seen
 // test state: not seen for 200ms
-fn match_substring_cond_not_seen_2() {
+fn match_cond_not_seen_2() {
     let cond_span = Duration::from_millis(400);
     let test_span = Duration::from_millis(200);
-    let mut s = ProcSysinfo::new();
-    s.refresh();
+    let mut s = System::new();
+    s.refresh_specifics(Scheduler::process_refresh_specs());
     let cond = ProcCondition::NotSeen(cond_span);
 
 
 
     let pat = "4hxHtngjjkXbA9XJtl9nrs/0kxqjvXnFK79Q8iUzWXo=";
     let mut p = process::Process::from_pattern(pat.into());
-    s.refresh();
+    s.refresh_specifics(Scheduler::process_refresh_specs());
     let t1 = Instant::now();
-    p.refresh(&s.sys, t1);
+    p.refresh(&s, t1);
 
 
     std::thread::sleep(test_span);
 
-    s.refresh();
-    p.refresh(&s.sys, Instant::now());
+    s.refresh_specifics(Scheduler::process_refresh_specs());
+    p.refresh(&s, Instant::now());
 
     // process exceeded cond
     let d = t1.elapsed().as_millis();

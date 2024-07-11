@@ -1,8 +1,6 @@
-#![allow(dead_code)]
+use std::os::unix::ffi::OsStrExt;
+use std::{fmt::Display, time::Duration};
 
-use std::{borrow::Borrow, os::unix::ffi::OsStrExt, time::Duration};
-
-use super::matching::*;
 use log::debug;
 use memchr;
 use serde::Deserialize;
@@ -16,6 +14,17 @@ pub enum ProcState {
     NeverSeen,
     Seen,
     NotSeen,
+}
+
+impl Display for ProcState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = match self {
+            Self::NeverSeen => "never_seen",
+            Self::Seen => "seen",
+            Self::NotSeen => "not_seen",
+        };
+        write!(f, "{state}")
+    }
 }
 
 /// User defined condition on a Process
@@ -45,6 +54,7 @@ pub struct Process {
     first_seen: Option<Instant>,
     last_seen: Option<Instant>,
     last_refresh: Option<Instant>,
+    prev_refresh: Option<Instant>,
     state: ProcState,
     prev_state: Option<ProcState>,
     pids: Vec<usize>,
@@ -57,6 +67,7 @@ impl Process {
             first_seen: None,
             last_seen: None,
             last_refresh: None,
+            prev_refresh: None,
             state: ProcState::NeverSeen,
             prev_state: None,
             pids: vec![],
@@ -64,37 +75,39 @@ impl Process {
     }
 
     pub fn refresh(&mut self, sysinfo: &System, last_refresh: Instant) {
-        let processes: Vec<_> = sysinfo.processes_by_name(&self.pattern).collect();
-        self.pids = processes
-            .iter()
+        self.pids = sysinfo.processes_by_name(&self.pattern)
             .map(|p| p.pid().into())
             .collect::<Vec<usize>>();
+        self.prev_refresh = self.last_refresh;
         self.last_refresh = Some(last_refresh);
-        match processes.len() {
-            0 => {
-                // no change if process still never seen
-                if !matches!(self.state, ProcState::NeverSeen) {
-                    self.prev_state = Some(self.state.clone());
-                    self.state = ProcState::NotSeen;
-                    debug!("<{}>: process disappread", self.pattern);
-                } else {
-                    self.prev_state = Some(ProcState::NeverSeen);
-                    debug!("<{}>: never seen so far", self.pattern);
-                }
-            }
 
-            // process found
-            _ => {
-                if self.prev_state.is_none() {
-                    self.first_seen = Some(last_refresh);
-                    debug!("<{}>: process seen first time", self.pattern);
-                } else {
-                    debug!("<{}>: process reappeared", self.pattern);
-                }
+        self.update_state();
+    }
+
+    fn update_state(&mut self) {
+
+        if self.pids.is_empty() {
+            // no change if process still never seen
+            if !matches!(self.state, ProcState::NeverSeen) {
                 self.prev_state = Some(self.state.clone());
-                self.state = ProcState::Seen;
-                self.last_seen = Some(last_refresh);
+                self.state = ProcState::NotSeen;
+                debug!("<{}>: process disappread", self.pattern);
+            } else {
+                self.prev_state = Some(ProcState::NeverSeen);
+                debug!("<{}>: never seen so far", self.pattern);
             }
+            // process found
+        } else {
+            if self.prev_state.is_none() {
+                self.first_seen = self.last_refresh;
+                debug!("<{}>: process seen first time", self.pattern);
+            } else {
+                debug!("<{}>: process reappeared", self.pattern);
+            }
+            self.prev_state = Some(self.state.clone());
+            self.state = ProcState::Seen;
+            self.last_seen = self.last_refresh;
+
         }
     }
 
@@ -128,12 +141,8 @@ impl Process {
         }
 
     }
-}
 
-impl Matcher for Process {
-    type Condition = ProcCondition;
-
-    fn matches(&self, c: Self::Condition) -> bool {
+    pub fn matches(&self, c: ProcCondition) -> bool {
         match c {
             ProcCondition::Seen(span) => {
                 if !matches!(self.state, ProcState::Seen) {
@@ -150,19 +159,16 @@ impl Matcher for Process {
                     false
                 } else if let Some(last_seen) = self.last_seen {
                     last_seen.elapsed() > c.span()
-
-
                 } else { matches!(self.state, ProcState::NeverSeen) &&
                         self.state == self.prev_state.clone().unwrap() &&
-                            self.last_refresh.is_some() &&
-                            self.last_refresh.unwrap().elapsed() > span
+                            self.prev_refresh.is_some() &&
+                            self.prev_refresh.unwrap().elapsed() > span
 
                 }
             } 
         }
     }
 }
-
 
 enum ProcessMatchBy {
     ExePath,
@@ -174,9 +180,10 @@ enum ProcessMatchBy {
 
 #[cfg(test)]
 use mock_instant::global::Instant;
+
 mod test {
     use mock_instant::global::MockClock;
-    use sysinfo::{ProcessRefreshKind, RefreshKind, UpdateKind};
+    use crate::sched::Scheduler;
     use super::*;
 
     #[test]
@@ -186,108 +193,136 @@ mod test {
         assert!(matches!(p.state, ProcState::NeverSeen))
     } 
 
+    // default process pattern matching (name)
     #[test]
-    fn match_pattern() -> anyhow::Result<(), std::io::Error> {
-        let mut p = std::process::Command::new("tests/5382952proc.sh")
+    fn match_pattern_default() -> anyhow::Result<(), std::io::Error> {
+        let pattern = "53829";
+        let mut target = std::process::Command::new("tests/5382952proc.sh")
             .arg("300")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
+        let mut p_match = Process::from_pattern(pattern.into());
+        let mut not_p_match = Process::from_pattern("foobar_234324".into());
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.refresh(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
 
+        not_p_match.refresh(&sys, Instant::now());
+        assert!(not_p_match.pids.is_empty());
 
-        p.kill()
+        target.kill()
     }
 
-    // #[test]
-    // fn cond_seen_since() {
-    //     let cond_seen = ProcState::Seen(Duration::from_secs(5));
-    //     let mut proc_state = ProcessState::new();
-    //     let mut last_refresh = Instant::now();
-    //
-    //     let detected = true;
-    //
-    //     // no process detected
-    //     let mut action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
-    //     assert!(matches!(action, Action::None));
-    //
-    //     // process detected
-    //     _ = proc_state.update(cond_seen.clone(), detected, last_refresh);
-    //     assert!(matches!(proc_state, ProcessState::Seen(n) if n == last_refresh));
-    //
-    //     // process exceeded condition
-    //     MockClock::advance(Duration::from_secs(6));
-    //     last_refresh = Instant::now();
-    //     action = proc_state.update(cond_seen.clone(), detected, last_refresh);
-    //     assert!(matches!(action, Action::Run));
-    //
-    //     // process disappread
-    //     MockClock::advance(Duration::from_secs(2));
-    //     last_refresh = Instant::now();
-    //     action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
-    //     assert!(matches!(proc_state, ProcessState::NotSeen(_)));
-    //     assert!(proc_state.not_seen_since().unwrap() == last_refresh.elapsed());
-    //     assert!(matches!(action, Action::None));
-    //
-    //     // process not seen
-    //     MockClock::advance(Duration::from_secs(5));
-    //     last_refresh = Instant::now();
-    //     action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
-    //     assert!(proc_state.not_seen_since().unwrap() == Duration::from_secs(5));
-    //     assert!(matches!(action, Action::None));
-    // }
+    #[test]
+    fn match_pattern_exe() {
+        todo!();
+    }
 
-    // #[test]
-    // fn test_not_seen_since() {
-    //     let cond_not_seen = ProcCondition::NotSeen(Duration::from_secs(5));
-    //     let p = Process::from_pattern("foo".into());
-    //     let mut last_refresh = Instant::now();
-    //
-    //     let process_refresh_kind = ProcessRefreshKind::new()
-    //         .with_cmd(UpdateKind::Always)
-    //         .with_cwd(UpdateKind::Always)
-    //         .with_exe(UpdateKind::Always);
-    //
-    //     let process_refresh = RefreshKind::new().with_processes(process_refresh_kind);
-    //     let mut s = System::new();
-    //
-    //     // used to simulate detection
-    //     let pids: Vec<usize> = vec![];
-    //
-    //     // Case 1: The process is never seen and the condition timeout is exceeded, triggering Run.
-    //     MockClock::advance(Duration::from_secs(7));
-    //     s.refresh_specifics(process_refresh);
-    //     p.refresh(&s, last_refresh);
-    //     assert!(p.matches(cond_not_seen));
-    //     // assert!(matches!(p.state, ProcState::NeverSeen { .. }));
-    //
-    //     // Reset for the next case
-    //     let p = Process::from_pattern("foo".into());
-    //     // Ensure we are at least 5 seconds into the future to test the timeout correctly.
-    //     MockClock::advance(Duration::from_secs(5));
-    //     p.refresh(&s, last_refresh);
-    //
-    //     // Case 2: A process is already running then disappears, the Run is triggered after the timeout.
-    //     last_refresh = Instant::now();
-    //
-    //     assert!(
-    //         matches!(proc_state, ProcessState::Seen(_)),
-    //         "process found but state is {} ",
-    //         proc_state
-    //     );
-    //     assert!(proc_state.seen_since().unwrap() == last_refresh.elapsed());
-    //
-    //     // Advance time to ensure the process is not seen anymore.
-    //     MockClock::advance(Duration::from_secs(1));
-    //     last_refresh = Instant::now();
-    //     proc_state.update(cond_not_seen.clone(), !found, last_refresh);
-    //     assert!(matches!(proc_state, ProcessState::NotSeen(_)));
-    //
-    //     // Process now exceeded the absent limit
-    //     MockClock::advance(Duration::from_secs(6));
-    //     last_refresh = Instant::now();
-    //     let action = proc_state.update(cond_not_seen.clone(), !found, last_refresh);
-    //     assert!(matches!(action, Action::Run));
-    //     }
+    #[test]
+    fn match_pattern_cmdline() {
+        todo!();
+    }
+    
+
+    #[test]
+    fn cond_seen_since() {
+        let cond_seen = ProcCondition::Seen(Duration::from_secs(5));
+        let mut p = Process::from_pattern("foo".into());
+        p.last_refresh = Some(Instant::now());
+
+
+        // no process detected initially
+        // let mut action = proc_state.update(cond_seen.clone(), !detected, last_refresh);
+        assert!(matches!(p.state, ProcState::NeverSeen));
+        assert!(!p.matches(cond_seen.clone()));
+
+        MockClock::advance(Duration::from_secs(2));
+
+        // process detected
+        p.pids = vec![1];
+        p.last_refresh = Some(Instant::now());
+        let first_seen = p.last_refresh;
+        p.update_state();
+        assert!(matches!(p.state, ProcState::Seen), "should be detected");
+        assert!(!p.matches(cond_seen.clone()), "should match user condition");
+
+        // process exceeded condition
+        MockClock::advance(Duration::from_secs(6));
+        p.last_refresh = Some(Instant::now());
+        let last_seen = p.last_refresh.unwrap();
+        p.update_state();
+        assert!(p.matches(cond_seen.clone()), "should match user condition");
+
+        // process disappread
+        MockClock::advance(Duration::from_secs(2));
+        p.pids = vec![];
+        p.last_refresh = Some(Instant::now());
+        p.update_state();
+        assert!(matches!(p.state, ProcState::NotSeen), "should be not seen");
+        assert!(p.last_seen.unwrap().elapsed() == last_seen.elapsed());
+        assert!(!p.matches(cond_seen.clone()), "should not match user condition");
+
+        // process still not seen
+        MockClock::advance(Duration::from_secs(5));
+        p.last_refresh = Some(Instant::now());
+        p.update_state();
+        // 5+2 = 7
+        assert!(p.last_seen.unwrap().elapsed() == Duration::from_secs(7));
+        assert!(!p.matches(cond_seen.clone()));
+        assert!(p.first_seen.unwrap() == first_seen.unwrap());
+    }
+
+    #[test]
+    fn test_not_seen_since() {
+        let cond_not_seen = ProcCondition::NotSeen(Duration::from_secs(5));
+        let mut p = Process::from_pattern("foo".into());
+        p.last_refresh = Some(Instant::now());
+        let t1 = p.last_refresh;
+        p.update_state();
+        assert!(matches!(p.state, ProcState::NeverSeen));
+        assert!(p.last_refresh.is_some());
+
+
+        // // Case 1: The process is never seen and the condition timeout is exceeded, triggering Run.
+        MockClock::advance(Duration::from_secs(7));
+        p.last_refresh = Some(Instant::now());
+        p.prev_refresh = t1;
+        p.update_state();
+        assert!(p.pids.is_empty(), "no pid should be detected");
+        assert!(p.matches(cond_not_seen.clone()));
+        assert!(matches!(p.state, ProcState::NeverSeen));
+
+        MockClock::advance(Duration::from_secs(5));
+
+        // Case 2: A process is already running then disappears, the Run is triggered after the timeout.
+        p.pids = vec![1];
+        p.last_refresh = Some(Instant::now());
+        p.update_state();
+
+        assert!(
+            matches!(p.state, ProcState::Seen),
+            "process found but state is {} ",
+            p.state
+        );
+        assert_eq!(p.last_seen, p.last_refresh);
+        assert!(!p.matches(cond_not_seen.clone()));
+
+        // process disappears
+        MockClock::advance(Duration::from_secs(1));
+        p.pids = vec![];
+        p.last_refresh = Some(Instant::now());
+        p.update_state();
+        assert!(matches!(p.state, ProcState::NotSeen));
+
+        // Process now exceeded the absent limit and matches user cond
+        MockClock::advance(Duration::from_secs(6));
+        p.last_refresh = Some(Instant::now());
+        p.update_state();
+        assert!(matches!(p.state, ProcState::NotSeen));
+        assert!(p.matches(cond_not_seen.clone()));
+        }
 }

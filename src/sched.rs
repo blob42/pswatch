@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::{process::Command, thread::sleep, time::Duration};
+use std::{process::Command, sync::OnceLock, thread::sleep, time::Duration};
 
 #[cfg(not(test))]
 use std::time::Instant;
@@ -9,8 +9,6 @@ use log::{debug, error, trace};
 use mock_instant::global::Instant;
 
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
-
-use crate::matching::Matcher;
 
 use super::process::{ProcCondition, Process};
 
@@ -37,7 +35,6 @@ pub struct CmdSchedule {
 }
 
 pub struct Scheduler {
-    refresh_type: RefreshKind,
     system_info: System,
     //FIX:
     jobs: Vec<ProfileJob>,
@@ -134,23 +131,31 @@ impl ProfileJob {
     }
 }
 
+static PROCESS_REFRESH_SPECS: OnceLock<RefreshKind> = OnceLock::new();
+
 impl Scheduler {
     const SAMPLING_RATE: Duration = Duration::from_secs(3);
 
-    pub fn new(profiles: Vec<Profile>) -> Self {
+    pub fn process_refresh_specs() -> RefreshKind {
+        *PROCESS_REFRESH_SPECS.get_or_init(||{
+
         let process_refresh_kind = ProcessRefreshKind::new()
             .with_cmd(UpdateKind::Always)
             .with_cwd(UpdateKind::Always)
             .with_exe(UpdateKind::Always);
 
-        let process_refresh_t = RefreshKind::new().with_processes(process_refresh_kind);
+        RefreshKind::new().with_processes(process_refresh_kind)
+        })
+    }
+
+    pub fn new(profiles: Vec<Profile>) -> Self {
+
         let jobs: Vec<ProfileJob> = profiles
             .iter()
             .map(|p| ProfileJob::new(p.clone()))
             .collect();
 
         Self {
-            refresh_type: process_refresh_t,
             system_info: System::new(),
             jobs: profiles
             .into_iter()
@@ -160,7 +165,7 @@ impl Scheduler {
     }
 
     fn refresh_proc_info(&mut self) {
-        self.system_info.refresh_specifics(self.refresh_type);
+        self.system_info.refresh_specifics(Self::process_refresh_specs());
     }
 
     pub fn run(&mut self) {
