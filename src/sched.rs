@@ -149,6 +149,7 @@ impl Scheduler {
     }
 
     pub fn new(profiles: Vec<Profile>) -> Self {
+        debug!("Using sampling rate of {:?}.", Self::SAMPLING_RATE);
 
         let jobs: Vec<ProfileJob> = profiles
             .iter()

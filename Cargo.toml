@@ -2,6 +2,7 @@
 name = "pswatch"
 version = "0.1.0"
 edition = "2021"
+default-run = "pswatch"
 
 
 [[bin]]
@@ -26,3 +27,6 @@ serde = { version = "1.0.203", features = ["derive"] }
 sysinfo = "0.30.12"
 toml = "0.8.14"
 xdg = "2.5.2"
+
+[dev-dependencies]
+rstest = "0.21.0"

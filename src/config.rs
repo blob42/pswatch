@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Context;
+use log::debug;
 use serde::Deserialize;
 
 use crate::sched::Profile;
@@ -23,6 +24,8 @@ pub fn read_config(p: Option<PathBuf>) -> anyhow::Result<Config> {
             .with_context(|| "could not find config dir")?
             .get_config_file("config.toml"),
     );
+
+    debug!("config file: {:?}", cfg_file);
 
     parse_config(
         &fs::read_to_string(&cfg_file)

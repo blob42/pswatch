@@ -98,11 +98,17 @@ impl Process {
             }
             // process found
         } else {
-            if self.prev_state.is_none() {
-                self.first_seen = self.last_refresh;
-                debug!("<{}>: process seen first time", self.pattern);
-            } else {
-                debug!("<{}>: process reappeared", self.pattern);
+            match self.state {
+                ProcState::NeverSeen => {
+                    self.first_seen = self.last_refresh;
+                    debug!("<{}>: process seen first time", self.pattern);
+                },
+                ProcState::NotSeen => {
+                    debug!("<{}>: process reappeared", self.pattern);
+                },
+                ProcState::Seen => {
+                    debug!("<{}>: process still running", self.pattern);
+                }
             }
             self.prev_state = Some(self.state.clone());
             self.state = ProcState::Seen;
@@ -181,6 +187,7 @@ enum ProcessMatchBy {
 #[cfg(test)]
 use mock_instant::global::Instant;
 
+#[allow(unused_imports)]
 mod test {
     use mock_instant::global::MockClock;
     use crate::sched::Scheduler;

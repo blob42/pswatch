@@ -1,24 +1,31 @@
 use std::time::{Duration, Instant};
 
 use pswatch::{process::{self, ProcCondition}, sched::Scheduler};
+use rstest::rstest;
 use sysinfo::System;
 
 
+#[rstest]
+#[case((200, 400), true)]
+#[case((200, 100), false)]
 #[test]
 // cond: seen for 200ms
 // start state: seen
-// test state: seen for 400ms
-//FIX:
-fn match_cond_seen() {
-    let cond_span = Duration::from_millis(200);
-    let test_span = Duration::from_millis(400);
+// test state: seen for test_span
+// (cond_span, test_span, should_match)
+fn match_cond_seen(
+    #[case] spans: (u64, u64),
+    #[case] should_match: bool
+) {
+    let cond_span = Duration::from_millis(spans.0);
+    let test_span = Duration::from_millis(spans.1);
     let mut s = System::new();
     let mut target = std::process::Command::new("tests/5382952proc.sh")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
 
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_millis(500));
     s.refresh_specifics(Scheduler::process_refresh_specs());
 
     // process exists
@@ -28,7 +35,6 @@ fn match_cond_seen() {
     let pat = "538295";
     let mut p = process::Process::from_pattern(pat.into());
     p.refresh(&s, Instant::now());
-    dbg!(&p);
 
     let cond = ProcCondition::Seen(cond_span);
 
@@ -38,21 +44,30 @@ fn match_cond_seen() {
     p.refresh(&s, Instant::now());
 
     // process exceeded cond
-    assert!(p.matches(cond), "process should be seen");
+    assert_eq!(p.matches(cond), should_match,
+    "process should be seen");
     let _ = target.kill();
 }
 
-#[test]
-// cond: not seen for 400ms
+// cond: not seen
 // start state: never seen
-// test state: never seen for 1s
-fn match_cond_not_seen() {
-    let cond_span = Duration::from_millis(400);
-    let test_span = Duration::from_millis(100);
+// test state: never seen for `test_span`
+// (cond_span, test_span, should_match)
+#[rstest]
+#[case((400, 500), true)]
+#[case((400, 300), false)]
+#[test]
+fn match_cond_not_seen(
+    #[case] spans: (u64, u64),
+    #[case] should_match: bool
+) {
+    let cond_span = Duration::from_millis(spans.0);
+    let test_span = Duration::from_millis(spans.1);
     let mut s = System::new();
+
+    std::thread::sleep(std::time::Duration::from_millis(500));
     s.refresh_specifics(Scheduler::process_refresh_specs());
     let cond = ProcCondition::NotSeen(cond_span);
-
 
 
     let pat = "4hxHtngjjkXbA9XJtl9nrs/0kxqjvXnFK79Q8iUzWXo=";
@@ -69,25 +84,35 @@ fn match_cond_not_seen() {
 
     // process exceeded cond
     let d = t1.elapsed().as_millis();
-    assert!(!p.matches(cond),
+    assert_eq!(p.matches(cond), should_match,
     "process is not absent long enough. \ncondition: not_seen({}ms) > observation: not_seen: {}ms",
     cond_span.as_millis() ,d);
 }
 
-#[test]
 // cond: not seen for 400ms
 // start state: seen
-// test state: not seen for 200ms
-fn match_cond_not_seen_2() {
-    let cond_span = Duration::from_millis(400);
-    let test_span = Duration::from_millis(200);
+// test state: not seen for `test_span`
+// (cond_span, test_span, should_match)
+#[rstest]
+#[case((400, 200), false)]
+#[test]
+fn match_cond_not_seen_2(
+    #[case] spans: (u64, u64),
+    #[case] should_match: bool
+) {
+    let cond_span = Duration::from_millis(spans.0);
+    let test_span = Duration::from_millis(spans.1);
     let mut s = System::new();
     s.refresh_specifics(Scheduler::process_refresh_specs());
     let cond = ProcCondition::NotSeen(cond_span);
 
+    let mut target = std::process::Command::new("tests/5382952proc.sh")
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
 
 
-    let pat = "4hxHtngjjkXbA9XJtl9nrs/0kxqjvXnFK79Q8iUzWXo=";
+    let pat = "538295";
     let mut p = process::Process::from_pattern(pat.into());
     s.refresh_specifics(Scheduler::process_refresh_specs());
     let t1 = Instant::now();
@@ -101,9 +126,10 @@ fn match_cond_not_seen_2() {
 
     // process exceeded cond
     let d = t1.elapsed().as_millis();
-    assert!(!p.matches(cond),
+    assert_eq!(p.matches(cond), should_match,
     "process is not absent long enough. \ncondition: not_seen({}ms) > observation: not_seen: {}ms",
     cond_span.as_millis() ,d);
 
+    let _ = target.kill();
 }
 
