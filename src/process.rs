@@ -4,7 +4,7 @@ use std::{fmt::Display, time::Duration};
 use log::debug;
 use memchr;
 use serde::Deserialize;
-use crate::state::{StateMatcher, StateTracker};
+use crate::state::{ConditionMatcher, StateTracker};
 
 #[cfg(test)]
 use mock_instant::thread_local::Instant;
@@ -110,19 +110,6 @@ impl Process {
         }
     }
 
-    // TODO!: remove
-    // pub fn refresh(&mut self, sysinfo: &System, last_refresh: Instant) -> ProcLifetime {
-    //     self.pids = sysinfo
-    //         .processes_by_name(&self.pattern)
-    //         .map(|p| p.pid().into())
-    //         .collect::<Vec<usize>>();
-    //     self.lifetime.prev_refresh = self.lifetime.last_refresh;
-    //     self.lifetime.last_refresh = Some(last_refresh);
-    //
-    //     self.update_state();
-    //     self.lifetime.clone()
-    // }
-
     fn update_inner_state(&mut self) {
         if self.pids.is_empty() {
             // no change if process still never seen
@@ -183,52 +170,46 @@ impl Process {
     fn matches_name(&self, info: &sysinfo::System) -> bool {
         info.processes_by_name(&self.pattern).next().is_some()
     }
+}
 
-    fn matches_pattern(&self, info: &sysinfo::System, match_by: ProcessMatchBy) -> bool {
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all="lowercase")]
+pub enum PatternIn {
+    ExePath,
+    Cmdline,
+    Name,
+}
+
+impl Default for PatternIn {
+    fn default() -> Self {
+        Self::Name
+    }
+}
+
+pub trait ProcessMatcher<MatchBy> {
+    fn matches_process(&self, info: &sysinfo::System, match_by: MatchBy) -> bool;
+}
+
+impl ProcessMatcher<PatternIn> for Process {
+    fn matches_process(&self, info: &sysinfo::System, match_by: PatternIn) -> bool {
         match match_by {
-            ProcessMatchBy::ExePath => self.matches_exe(info),
-            ProcessMatchBy::Cmdline => self.matches_cmdline(info),
-            ProcessMatchBy::Name => self.matches_name(info),
+            PatternIn::ExePath => self.matches_exe(info),
+            PatternIn::Cmdline => self.matches_cmdline(info),
+            PatternIn::Name => self.matches_name(info),
         }
     }
-
-    // pub fn matches(&self, c: ProcCondition) -> bool {
-    //     match c {
-    //         ProcCondition::Seen(_) => {
-    //             if !matches!(self.get_state(), ProcState::Seen) {
-    //                 return false;
-    //             };
-    //             if let Some(first_seen) = self.lifetime.first_seen {
-    //                 first_seen.elapsed() > c.span()
-    //             } else {
-    //                 false
-    //             }
-    //         }
-    //         ProcCondition::NotSeen(span) => {
-    //             if !matches!(self.get_state(), ProcState::NotSeen | ProcState::NeverSeen) {
-    //                 false
-    //             } else if let Some(last_seen) = self.lifetime.last_seen {
-    //                 last_seen.elapsed() > c.span()
-    //             } else {
-    //                 matches!(self.get_state(), ProcState::NeverSeen)
-    //                     && self.get_state() == self.lifetime.prev_state.clone().unwrap()
-    //                     && self.lifetime.prev_refresh.is_some()
-    //                     && self.lifetime.prev_refresh.unwrap().elapsed() > span
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 
 impl StateTracker for Process {
 
     /// updates the state and return a copy of the new state
-    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> impl StateMatcher {
+    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> impl ConditionMatcher {
         self.pids = info
             .processes_by_name(&self.pattern)
             .map(|p| p.pid().into())
             .collect::<Vec<usize>>();
+        debug!("<{}> detected pids: {}", self.pattern, self.pids.len());
         self.lifetime.prev_refresh = self.lifetime.last_refresh;
         self.lifetime.last_refresh = Some(t_refresh);
 
@@ -237,7 +218,7 @@ impl StateTracker for Process {
     }
 }
 
-impl StateMatcher for Process {
+impl ConditionMatcher for Process {
     type Condition = ProcCondition;
     type State = ProcState;
 
@@ -254,7 +235,7 @@ impl StateMatcher for Process {
     }
 }
 
-impl StateMatcher for ProcLifetime {
+impl ConditionMatcher for ProcLifetime {
     type Condition = ProcCondition;
     type State = ProcState;
 
@@ -295,11 +276,6 @@ impl StateMatcher for ProcLifetime {
     }
 }
 
-enum ProcessMatchBy {
-    ExePath,
-    Cmdline,
-    Name,
-}
 
 #[cfg(test)]
 #[allow(unused_imports)]

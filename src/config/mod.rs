@@ -3,8 +3,9 @@ use std::{fs, path::PathBuf};
 use anyhow::Context;
 use log::debug;
 use serde::Deserialize;
+mod profile;
 
-use crate::sched::Profile;
+pub use profile::{Profile, CmdSchedule};
 
 
 /// Main config for project. It is loaded from TOML or YAML in that order
@@ -38,16 +39,17 @@ mod tests {
     use super::*;
     use indoc::indoc;
 
-    //TODO:
     #[test]
     fn config_template() -> anyhow::Result<()> {
         let config = indoc! {r###"
             [[profiles]]
             pattern = "foo_seen"
             regex = false
+
             [[profiles.commands]]
             condition = {seen = "5s"}
             exec = ["echo", "seen"]
+            exec_end = ["echo", "end"]
 
             [[profiles.commands]]
             condition = {seen = "10s"}
@@ -55,6 +57,7 @@ mod tests {
 
             [[profiles]]
             pattern = "foo_not_seen"
+            pattern_in = "cmdline"
             regex = false
             [[profiles.commands]]
             condition = {not_seen = "5s"}

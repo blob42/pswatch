@@ -14,6 +14,7 @@ exec_end = ["sh", "-c", "notify-send 'bar end'"]
 
 [[profiles]]
 pattern = "foo"
+pattern_in = "cmdline"
 regex = false
 
 [[profiles.commands]]

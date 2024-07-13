@@ -5,7 +5,7 @@ use std::time::Instant;
 #[cfg(test)]
 use mock_instant::thread_local::Instant;
 
-pub trait StateMatcher {
+pub trait ConditionMatcher {
     type Condition;
     type State;
 
@@ -20,5 +20,5 @@ pub trait StateMatcher {
 }
 
 pub trait StateTracker {
-    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> impl StateMatcher;
+    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> impl ConditionMatcher;
 }
