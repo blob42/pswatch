@@ -1,14 +1,20 @@
 use serde::Deserialize;
 use std::{process::Command, sync::OnceLock, thread::sleep, time::Duration};
 
+use log::{debug, error, trace};
+
+#[cfg(test)]
+use mock_instant::thread_local::Instant;
+
 #[cfg(not(test))]
 use std::time::Instant;
 
-use log::{debug, error, trace};
-#[cfg(test)]
-use mock_instant::global::Instant;
-
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
+
+use crate::{
+    process::{ProcLifetime, ProcState},
+    state::{StateMatcher, StateTracker},
+};
 
 use super::process::{ProcCondition, Process};
 
@@ -32,12 +38,6 @@ pub struct CmdSchedule {
     /// Not serialized or deserialized by `serde`; indicates if the command schedule is disabled.
     #[serde(skip)]
     disabled: bool,
-}
-
-pub struct Scheduler {
-    system_info: System,
-    //FIX:
-    jobs: Vec<ProfileJob>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -67,43 +67,50 @@ fn default_watch_interval() -> Duration {
     Duration::from_secs(5)
 }
 
-pub(crate) struct ProfileJob {
-    profile: Profile,
-    process: Process,
+/// A job that can run in the scheduler
+trait Job {
+    fn update(&mut self, sysinfo: &System, last_refresh: Instant);
 }
 
-impl ProfileJob {
-    pub fn new(profile: Profile) -> Self {
+pub(crate) struct ProfileJob<T>
+where
+    T: StateTracker + StateMatcher,
+{
+    profile: Profile,
+    object: T,
+}
+
+impl ProfileJob<Process> {
+
+    pub fn from_profile(profile: Profile) -> Self {
         let pattern = profile.pattern.clone();
         Self {
             profile,
-            process: Process::from_pattern(pattern),
+            object: Process::build(pattern, ProcLifetime::new()),
         }
     }
+}
 
-    pub(crate) fn update_state(&mut self, sysinfo: &System, last_refresh: Instant) {
-        // let detected = sysinfo.processes_by_name(&self.conf.pattern).count() > 0;
-        // let detected = match sysinfo.processes_by_name(&self.conf.pattern).count() {
-        //     0 => Event::NotDetected,
-        //     _ => Event::Detected(last_refresh),
-        // };
 
-        self.process.refresh(sysinfo, last_refresh);
 
-        let enabled_cmds: Vec<_> = self
-            .profile
-            .commands
-            .iter_mut()
-            .filter(|c| !c.disabled)
-            .collect();
-        // dbg!(&enabled_cmds);
+impl Job for ProfileJob<Process> {
 
-        for cmd in enabled_cmds {
-            // let action = self
-            //     .state
-            //     .update(cmd.condition.clone(), detected, last_refresh);
+    fn update(&mut self, sysinfo: &System, last_refresh: Instant) {
+        // if we are entering or exiting the seen/not_seen state
+        {
+            let _ = self.object.update_state(sysinfo, last_refresh);
+            if (matches!(self.object.state(), ProcState::Seen)
+                && matches!(self.object.prev_state(), Some(ProcState::NotSeen))) ||
+                (matches!(self.object.state(), ProcState::NotSeen)
+                 && matches!(self.object.prev_state(), Some(ProcState::Seen)))
+            {
+                dbg!("run exec_end !");
+            }
+        }
 
-            if self.process.matches(cmd.condition.clone()) {
+        // only process enabled commands
+        for cmd in self.profile.commands.iter_mut().filter(|c| !c.disabled) {
+            if self.object.matches(cmd.condition.clone()) {
                 let out = Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output();
 
                 match out {
@@ -118,7 +125,7 @@ impl ProfileJob {
                         }
                     }
                     Err(e) => {
-                        error!("failed to run cmd for {}", self.profile.pattern);
+                        error!("{}: failed to run cmd for: {}", self.profile.pattern, e);
                         cmd.disabled = true
                     }
                 }
@@ -131,62 +138,74 @@ impl ProfileJob {
     }
 }
 
+pub struct Scheduler {
+    system_info: System,
+    jobs: Vec<Box<dyn Job>>,
+}
+
 static PROCESS_REFRESH_SPECS: OnceLock<RefreshKind> = OnceLock::new();
 
-impl Scheduler {
+impl Scheduler
+{
     const SAMPLING_RATE: Duration = Duration::from_secs(3);
 
     pub fn process_refresh_specs() -> RefreshKind {
-        *PROCESS_REFRESH_SPECS.get_or_init(||{
+        *PROCESS_REFRESH_SPECS.get_or_init(|| {
+            let process_refresh_kind = ProcessRefreshKind::new()
+                .with_cmd(UpdateKind::Always)
+                .with_cwd(UpdateKind::Always)
+                .with_exe(UpdateKind::Always);
 
-        let process_refresh_kind = ProcessRefreshKind::new()
-            .with_cmd(UpdateKind::Always)
-            .with_cwd(UpdateKind::Always)
-            .with_exe(UpdateKind::Always);
-
-        RefreshKind::new().with_processes(process_refresh_kind)
+            RefreshKind::new().with_processes(process_refresh_kind)
         })
     }
 
-    pub fn new(profiles: Vec<Profile>) -> Self {
+    pub fn new() -> Self {
         debug!("Using sampling rate of {:?}.", Self::SAMPLING_RATE);
-
-        let jobs: Vec<ProfileJob> = profiles
-            .iter()
-            .map(|p| ProfileJob::new(p.clone()))
-            .collect();
 
         Self {
             system_info: System::new(),
-            jobs: profiles
-            .into_iter()
-            .map(ProfileJob::new)
-            .collect(),
+            jobs: Vec::new(),
+        }
+    }
+
+    // NOTE: when other types of (matcher, tracker) will be available for other resources:
+    // Define type of profile in an enum and call the concrete version of the generic implmentation
+    pub fn from_profiles(profiles: Vec<Profile>) -> Self
+    {
+        let mut jobs: Vec<Box<dyn Job>> = Vec::with_capacity(profiles.len());
+        profiles.into_iter()
+            .map(ProfileJob::from_profile)
+            .for_each(|pj| jobs.push(Box::new(pj)));
+
+        Self {
+            system_info: System::new(),
+            jobs,
+
         }
     }
 
     fn refresh_proc_info(&mut self) {
-        self.system_info.refresh_specifics(Self::process_refresh_specs());
+        self.system_info
+            .refresh_specifics(Self::process_refresh_specs());
     }
 
     pub fn run(&mut self) {
         loop {
             self.refresh_proc_info();
 
-            // iterate over all watched processes and find matching ones in system info
-            //
-            // Process detections cases:
-            // - seen pattern + process exists
-            // - not seen pattern + process exists
-            // - seen pattern + no process
-            // - not seen pattern + no process
-
             self.jobs
                 .iter_mut()
-                .for_each(|j| j.update_state(&self.system_info, Instant::now()));
+                .for_each(|job| job.update(&self.system_info, Instant::now()));
 
             trace!("refresh sysinfo");
             sleep(Self::SAMPLING_RATE);
         }
+    }
+}
+
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
     }
 }

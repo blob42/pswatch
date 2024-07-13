@@ -29,12 +29,14 @@
 //! - `process`: Contains the definition and implementation of `ProcessWatch`, `ProcCondition`, and `ProcessWatchConfig`.
 use std::{collections::HashMap, thread::sleep, time::Duration};
 
-#[cfg(not(test))]
-use std::time::Instant;
 
 use log::trace;
+
 #[cfg(test)]
 use mock_instant::global::Instant;
+
+#[cfg(not(test))]
+use std::time::Instant;
 
 use serde::{Deserialize, Deserializer};
 use std::process::Command;

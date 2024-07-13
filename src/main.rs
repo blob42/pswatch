@@ -62,7 +62,7 @@ fn main() -> anyhow::Result<()> {
 
     let program_cfg = config::read_config(cli.config).context("missing config file")?;
 
-    let mut scheduler = Scheduler::new(program_cfg.profiles);
+    let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
     //TODO: own thread
     scheduler.run();
     Ok(())

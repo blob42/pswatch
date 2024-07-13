@@ -7,18 +7,18 @@ regex = false
 condition = {not_seen = "5s"}
 
 # one off command
-exec = ["sh", "-c", "echo not seen !"]
+exec = ["sh", "-c", "notify-send bar"]
 
 # when exec_end is defined the schedule behaves like a toggle
-# exec_end
+exec_end = ["sh", "-c", "notify-send 'bar end'"]
 
 [[profiles]]
 pattern = "foo"
 regex = false
 
 [[profiles.commands]]
-# lifetime = {not_seen = "3m"}
-condition = {not_seen = "5s"}
+condition = {seen = "5s"}
 
 # one off command
-exec = ["sh", "-c", "echo not seen !"]
+exec = ["sh", "-c", "notify-send foo"]
+exec_end = ["sh", "-c", "notify-send 'foo end'"]

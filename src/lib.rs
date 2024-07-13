@@ -1,7 +1,5 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 pub mod process;
+pub mod state;
 pub mod sched;
 pub mod config;
 

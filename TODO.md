@@ -1,3 +1,4 @@
+- match multiple patterns
 - cmd exec:
     [x] repeat on cmd failure
     [x] disable profile on cmd failure
