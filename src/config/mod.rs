@@ -5,15 +5,13 @@ use log::debug;
 use serde::Deserialize;
 mod profile;
 
-pub use profile::{Profile, CmdSchedule};
-
+pub use profile::{CmdSchedule, Profile};
 
 /// Main config for project. It is loaded from TOML or YAML in that order
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub profiles: Vec<Profile>,
 }
-
 
 fn parse_config(content: &str) -> anyhow::Result<Config> {
     Ok(toml::from_str(content)?)
@@ -43,8 +41,7 @@ mod tests {
     fn config_template() -> anyhow::Result<()> {
         let config = indoc! {r###"
             [[profiles]]
-            pattern = "foo_seen"
-            regex = false
+            matching = { cmdline = "foo_seen" }
 
             [[profiles.commands]]
             condition = {seen = "5s"}
@@ -56,9 +53,8 @@ mod tests {
             exec = ["echo", "still there"]
 
             [[profiles]]
-            pattern = "foo_not_seen"
-            pattern_in = "cmdline"
-            regex = false
+            matching = { name = "foo_not_seen" }
+
             [[profiles.commands]]
             condition = {not_seen = "5s"}
             exec = ["echo", "not seen"]

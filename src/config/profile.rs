@@ -1,21 +1,35 @@
-use std::time::Duration;
+use crate::{matching::PatternIn, process::ProcCondition};
 use serde::Deserialize;
-use crate::process::{PatternIn, ProcCondition};
+use std::time::Duration;
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ProfileMatching {
+
+    /// process identification 
+    #[serde(flatten)]
+    pub pattern: PatternIn<String>,
+
+    /// Interpret `pattern` as regex
+    #[serde(default)]
+    pub regex: bool
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Profile {
+
     /// pattern of process name to match against
-    pub pattern: String,
+    pub matching: ProfileMatching,
 
-    #[serde(default)]
-    pub pattern_in: PatternIn,
+    // /// Where to match the process pattern (exe, cmdline, name)
+    // #[serde(default)]
 
+    // pub pattern_in: PatternIn,
     /// List of commands to run when condition is met
     pub commands: Vec<CmdSchedule>,
 
-    #[serde(default)]
     /// Interpret `pattern` as regex
-    pub regex: bool,
+    // #[serde(default)]
+    // pub regex: bool,
 
     //TODO:
     // pub match_by:
@@ -49,7 +63,6 @@ pub struct CmdSchedule {
     #[serde(default)]
     pub run_once: bool,
 
-    /// Not serialized or deserialized by `serde`; indicates if the command schedule is disabled.
     #[serde(skip)]
     pub disabled: bool,
 }

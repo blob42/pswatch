@@ -19,7 +19,6 @@ use pswatch::{config, sched::Scheduler};
 use sd_notify::{notify, NotifyState};
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
-
 /// Watch and run commands on matching processes
 ///
 /// This program watches system processes for user setup patterns and runs
@@ -63,7 +62,7 @@ fn main() -> anyhow::Result<()> {
     dbg!(program_cfg);
 
     // let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
-    // //TODO: own thread
+    // // //TODO: own thread
     // scheduler.run();
     Ok(())
 }

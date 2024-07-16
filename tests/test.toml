@@ -1,6 +1,10 @@
 [[profiles]]
-pattern = "bar"
-regex = false
+
+# [[profiles.matching]]
+# exe_path = "foo"
+
+matching = { exe_path = "foo" }
+
 
 [[profiles.commands]]
 # lifetime = {not_seen = "3m"}
@@ -13,9 +17,10 @@ exec = ["sh", "-c", "notify-send bar"]
 exec_end = ["sh", "-c", "notify-send 'bar end'"]
 
 [[profiles]]
-pattern = "foo"
-pattern_in = "cmdline"
-regex = false
+# pattern = "foo"
+# pattern_in = "cmdline"
+matching = { cmdline = "^fo?", regex = true }
+# regex = false
 
 [[profiles.commands]]
 condition = {seen = "5s"}

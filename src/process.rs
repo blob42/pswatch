@@ -1,18 +1,19 @@
+use core::fmt::Debug;
 use std::os::unix::ffi::OsStrExt;
 use std::{fmt::Display, time::Duration};
 
+use crate::matching::{MatchBy, PatternIn};
+use crate::state::{ConditionMatcher, StateTracker};
 use log::debug;
 use memchr;
 use serde::Deserialize;
-use crate::state::{ConditionMatcher, StateTracker};
+use sysinfo;
 
 #[cfg(test)]
 use mock_instant::thread_local::Instant;
 
 #[cfg(not(test))]
 use std::time::Instant;
-
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProcState {
@@ -30,8 +31,6 @@ pub struct ProcLifetime {
     prev_state: Option<ProcState>,
     state: ProcState,
 }
-
-
 
 impl ProcLifetime {
     pub fn new() -> ProcLifetime {
@@ -87,14 +86,13 @@ impl ProcCondition {
 
 #[derive(Debug)]
 pub struct Process {
-    pattern: String,
+    pattern: PatternIn<String>,
     lifetime: ProcLifetime,
     pids: Vec<usize>,
 }
 
 impl Process {
-
-    pub fn build(pat: String, state_matcher: ProcLifetime) -> Self {
+    pub fn build(pat: PatternIn<String>, state_matcher: ProcLifetime) -> Self {
         Self {
             pattern: pat,
             lifetime: state_matcher,
@@ -102,7 +100,7 @@ impl Process {
         }
     }
 
-    pub fn from_pattern(pat: String) -> Self {
+    pub fn from_pattern(pat: PatternIn<String>) -> Self {
         Self {
             pattern: pat,
             lifetime: ProcLifetime::new(),
@@ -141,89 +139,79 @@ impl Process {
         }
     }
 
-    /// matches processes on the full path to the executable
-    fn matches_exe(&self, info: &sysinfo::System) -> bool {
-        info.processes()
-            .values()
-            .filter_map(|proc| {
-                let finder = memchr::memmem::Finder::new(&self.pattern);
-                proc.exe()
-                    .and_then(|exe_name| finder.find(exe_name.as_os_str().as_bytes()))
-            })
-            .next()
-            .is_some()
-    }
+    // /// matches processes on the full path to the executable
+    // fn matches_exe(&self, info: &sysinfo::System) -> bool {
+    //     info.processes()
+    //         .values()
+    //         .filter_map(|proc| {
+    //             let finder = memchr::memmem::Finder::new(&self.pattern);
+    //             proc.exe()
+    //                 .and_then(|exe_name| finder.find(exe_name.as_os_str().as_bytes()))
+    //         })
+    //         .next()
+    //         .is_some()
+    // }
 
-    /// matches processes on the full command line
-    fn matches_cmdline(&self, info: &sysinfo::System) -> bool {
-        info.processes()
-            .values()
-            .filter_map(|proc| {
-                let finder = memchr::memmem::Finder::new(&self.pattern);
-                finder.find(proc.cmd().join(" ").as_bytes())
-            })
-            .next()
-            .is_some()
-    }
+    // /// matches processes on the full command line
+    // fn matches_cmdline(&self, info: &sysinfo::System) -> bool {
+    //     info.processes()
+    //         .values()
+    //         .filter_map(|proc| {
+    //             let finder = memchr::memmem::Finder::new(&self.pattern);
+    //             finder.find(proc.cmd().join(" ").as_bytes())
+    //         })
+    //         .next()
+    //         .is_some()
+    // }
 
-    /// matches processes the command name only
-    fn matches_name(&self, info: &sysinfo::System) -> bool {
-        info.processes_by_name(&self.pattern).next().is_some()
-    }
+    // /// matches processes the command name only
+    // fn matches_name(&self, info: &sysinfo::System) -> bool {
+    //     info.processes_by_name(&self.pattern).next().is_some()
+    // }
 }
 
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all="lowercase")]
-pub enum PatternIn {
-    ExePath,
-    Cmdline,
-    Name,
-}
+// pub trait ProcessMatcher<MatchBy> {
+//     fn matches_process(&self, info: &sysinfo::System, match_by: MatchBy) -> bool;
+// }
 
-impl Default for PatternIn {
-    fn default() -> Self {
-        Self::Name
-    }
-}
-
-pub trait ProcessMatcher<MatchBy> {
-    fn matches_process(&self, info: &sysinfo::System, match_by: MatchBy) -> bool;
-}
-
-impl ProcessMatcher<PatternIn> for Process {
-    fn matches_process(&self, info: &sysinfo::System, match_by: PatternIn) -> bool {
-        match match_by {
-            PatternIn::ExePath => self.matches_exe(info),
-            PatternIn::Cmdline => self.matches_cmdline(info),
-            PatternIn::Name => self.matches_name(info),
-        }
-    }
-}
+// FIX: remove
+// impl ProcessMatcher<PatternIn> for Process {
+//     fn matches_process(&self, info: &sysinfo::System, match_by: PatternIn) -> bool {
+//         match match_by {
+//             PatternIn::ExePath => self.matches_exe(info),
+//             PatternIn::Cmdline => self.matches_cmdline(info),
+//             PatternIn::Name => self.matches_name(info),
+//         }
+//     }
+// }
 
 
-impl StateTracker for Process {
+impl StateTracker for Process
+{
+    type State = ProcState;
 
     /// updates the state and return a copy of the new state
-    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> impl ConditionMatcher {
+    fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> ProcState {
         self.pids = info
-            .processes_by_name(&self.pattern)
-            .map(|p| p.pid().into())
-            .collect::<Vec<usize>>();
+            .processes()
+            .into_iter()
+            .filter(|(_, proc)| MatchBy::match_by(*proc, self.pattern.clone()))
+            .map(|(_, proc)| proc.pid().into())
+            .collect();
+
+        // detect running process
+        // self.pids = info
+        //     //FIX:
+        //     .processes_by_name(self.pattern)
+        //     .map(|p| p.pid().into())
+        //     .collect::<Vec<usize>>();
         debug!("<{}> detected pids: {}", self.pattern, self.pids.len());
+
         self.lifetime.prev_refresh = self.lifetime.last_refresh;
         self.lifetime.last_refresh = Some(t_refresh);
 
         self.update_inner_state();
-        self.lifetime.clone()
-    }
-}
-
-impl ConditionMatcher for Process {
-    type Condition = ProcCondition;
-    type State = ProcState;
-
-    fn matches(&self, c: Self::Condition) -> bool {
-        self.lifetime.matches(c)
+        self.lifetime.state.clone()
     }
 
     fn state(&self) -> Self::State {
@@ -235,9 +223,16 @@ impl ConditionMatcher for Process {
     }
 }
 
+impl ConditionMatcher for Process {
+    type Condition = ProcCondition;
+
+    fn matches(&self, c: Self::Condition) -> bool {
+        self.lifetime.matches(c)
+    }
+}
+
 impl ConditionMatcher for ProcLifetime {
     type Condition = ProcCondition;
-    type State = ProcState;
 
     fn matches(&self, cond: Self::Condition) -> bool {
         match cond {
@@ -266,35 +261,25 @@ impl ConditionMatcher for ProcLifetime {
             }
         }
     }
-
-    fn state(&self) -> Self::State {
-        self.state.clone()
-    }
-
-    fn prev_state(&self) -> Option<Self::State> {
-        self.prev_state.clone()
-    }
 }
-
 
 #[cfg(test)]
 #[allow(unused_imports)]
 mod test {
     use super::*;
-    use sysinfo::System;
     use crate::{sched::Scheduler, state::*};
     use mock_instant::thread_local::MockClock;
+    use sysinfo::System;
 
     #[test]
     fn default_process() {
-        let pat = "foo";
-        let p = Process::from_pattern(pat.into());
+        let p = Process::from_pattern(PatternIn::Name("foo".into()));
         assert!(matches!(p.state(), ProcState::NeverSeen))
     }
 
-    // default process pattern matching (name)
+    // default process matching on process name
     #[test]
-    fn match_pattern_default() -> anyhow::Result<(), std::io::Error> {
+    fn match_process_name() -> anyhow::Result<(), std::io::Error> {
         let pattern = "53829";
         let mut target = std::process::Command::new("tests/5382952proc.sh")
             .arg("300")
@@ -303,35 +288,62 @@ mod test {
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
-        let mut p_match = Process::from_pattern(pattern.into());
-        let mut not_p_match = Process::from_pattern("foobar_234324".into());
+        let mut p_match = Process::from_pattern(PatternIn::Name(pattern.into()));
+        let mut p_does_not_match = Process::from_pattern(PatternIn::Name("foobar_234324".into()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
-        
+
         p_match.update_state(&sys, Instant::now());
+        // dbg!(sys.processes().get(&p_match.pids[0].into()));
         assert!(!p_match.pids.is_empty());
 
-        not_p_match.update_state(&sys, Instant::now());
-        assert!(not_p_match.pids.is_empty());
+        p_does_not_match.update_state(&sys, Instant::now());
+        assert!(p_does_not_match.pids.is_empty());
 
         target.kill()
     }
 
     #[test]
-    fn match_pattern_exe() {
-        todo!();
+    fn match_pattern_exe() -> anyhow::Result<(), std::io::Error> {
+        let pattern = "/bin";
+        let mut target = std::process::Command::new("tests/5382952proc.sh")
+            .arg("300")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+        let mut p_match = Process::from_pattern(PatternIn::ExePath(pattern.into()));
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.update_state(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
+        target.kill()
     }
 
     #[test]
-    fn match_pattern_cmdline() {
-        todo!();
+    fn match_pattern_cmdline() -> anyhow::Result<(), std::io::Error> {
+        let pattern = "300";
+        let mut target = std::process::Command::new("tests/5382952proc.sh")
+            .arg("300")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+        let mut p_match = Process::from_pattern(PatternIn::Cmdline(pattern.into()));
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.update_state(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
+        target.kill()
     }
 
     #[test]
     fn cond_seen_since() {
         MockClock::set_time(Duration::ZERO);
         let cond_seen = ProcCondition::Seen(Duration::from_secs(5));
-        let mut p = Process::from_pattern("foo".into());
+        let mut p = Process::from_pattern(PatternIn::Name("foo".into()));
         p.lifetime.last_refresh = Some(Instant::now());
 
         // no process detected initially
@@ -350,14 +362,20 @@ mod test {
             matches!(p.lifetime.state, ProcState::Seen),
             "should be detected"
         );
-        assert!(!p.lifetime.matches(cond_seen.clone()), "should match user condition");
+        assert!(
+            !p.lifetime.matches(cond_seen.clone()),
+            "should match user condition"
+        );
 
         // process exceeded condition
         MockClock::advance(Duration::from_secs(6));
         p.lifetime.last_refresh = Some(Instant::now());
         let last_seen = p.lifetime.last_refresh.unwrap();
         p.update_inner_state();
-        assert!(p.lifetime.matches(cond_seen.clone()), "should match user condition");
+        assert!(
+            p.lifetime.matches(cond_seen.clone()),
+            "should match user condition"
+        );
 
         // process disappread
         MockClock::advance(Duration::from_secs(2));
@@ -388,7 +406,7 @@ mod test {
     fn test_not_seen_since() {
         MockClock::set_time(Duration::ZERO);
         let cond_not_seen = ProcCondition::NotSeen(Duration::from_secs(5));
-        let mut p = Process::from_pattern("foo".into());
+        let mut p = Process::from_pattern(PatternIn::Name("foo".into()));
         p.lifetime.last_refresh = Some(Instant::now());
         let t1 = p.lifetime.last_refresh;
         p.update_inner_state();
