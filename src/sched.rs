@@ -118,7 +118,9 @@ impl Job for ProfileJob<Process> {
                 .for_each(|cmd| {
                     //FIX: current state should be opposite of condition
                     //ie cond=Seen, exec_end runs when state is NotSeen after Seen
-                    run_cmd(cmd, self.profile.matching.clone(), true);
+                    if !self.object.partial_match(cmd.condition.clone()).is_some_and(|m| m) {
+                        run_cmd(cmd, self.profile.matching.clone(), true);
+                    }
                 });
         }
 

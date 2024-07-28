@@ -184,6 +184,8 @@ impl StateTracker for Process
     fn exiting(&self) -> bool {
         self.lifetime.state_exit
     }
+
+    
 }
 
 impl ConditionMatcher for Process {
@@ -192,6 +194,12 @@ impl ConditionMatcher for Process {
     fn matches(&self, c: Self::Condition) -> bool {
         self.lifetime.matches(c)
     }
+
+    fn partial_match(&self, c: Self::Condition) -> Option<bool> {
+        self.lifetime.partial_match(c)
+    }
+
+    
 }
 
 impl ConditionMatcher for ProcLifetime {
@@ -221,6 +229,17 @@ impl ConditionMatcher for ProcLifetime {
                         && self.prev_refresh.is_some()
                         && self.prev_refresh.unwrap().elapsed() > span
                 }
+            }
+        }
+    }
+
+    fn partial_match(&self, cond: Self::Condition) -> Option<bool> {
+        match cond {
+            ProcCondition::Seen(_) => {
+                Some(matches!(self.state, ProcState::Seen))
+            }
+            ProcCondition::NotSeen(_) => {
+                Some(matches!(self.state, ProcState::NotSeen | ProcState::NeverSeen))
             }
         }
     }
