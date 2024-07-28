@@ -14,6 +14,7 @@ condition = {seen = "5s"}
 exec = ["sh", "-c", "notify-send 'foo seen'"]
 
 # when exec_end is defined the schedule behaves like a toggle
+# cmd is executed when exiting condition
 exec_end = ["sh", "-c", "notify-send 'foo end'"]
 
 run_once = true

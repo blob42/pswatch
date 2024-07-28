@@ -112,7 +112,11 @@ impl Process {
             if !matches!(self.state(), ProcState::NeverSeen) {
                 self.lifetime.prev_state = Some(self.lifetime.state.clone());
                 self.lifetime.state = ProcState::NotSeen;
-                self.lifetime.state_exit = true;
+                if self.lifetime.prev_state != Some(ProcState::NotSeen) {
+                    self.lifetime.state_exit = true;
+                } else {
+                    self.lifetime.state_exit = false;
+                }
                 debug!("<{}>: process disappread", self.pattern);
             } else {
                 self.lifetime.state_exit = false;
@@ -130,6 +134,9 @@ impl Process {
                 ProcState::NotSeen => {
                     debug!("<{}>: process reappeared", self.pattern);
                     self.lifetime.state_exit = true;
+
+                    // reset first_seen
+                    self.lifetime.first_seen = self.lifetime.last_refresh;
                 }
                 ProcState::Seen => {
                     self.lifetime.state_exit = false;
@@ -140,7 +147,6 @@ impl Process {
             self.lifetime.state = ProcState::Seen;
             self.lifetime.last_seen = self.lifetime.last_refresh;
         }
-        dbg!(self.lifetime.state_exit);
     }
 }
 

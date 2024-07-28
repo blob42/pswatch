@@ -11,7 +11,7 @@ use std::time::Instant;
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
 
 use crate::config::{CmdSchedule, Profile, ProfileMatching};
-use crate::process::{ProcLifetime, ProcState};
+use crate::process::ProcLifetime;
 use crate::state::{ConditionMatcher, StateTracker};
 
 use super::process::Process;
@@ -46,6 +46,8 @@ fn run_cmd(cmd: &mut CmdSchedule, matching: ProfileMatching, exec_end: bool) {
     let out = if exec_end && cmd.exec_end.is_some() {
         dbg!("run exec_end !");
         Command::new(&cmd.exec_end.as_ref().unwrap()[0]).args(&cmd.exec_end.as_ref().unwrap()[1..]).output()
+    } else if exec_end && cmd.exec_end.is_none() {
+        return;
     } else {
         dbg!("running command !");
         Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output()
@@ -73,8 +75,6 @@ fn run_cmd(cmd: &mut CmdSchedule, matching: ProfileMatching, exec_end: bool) {
     if cmd.run_once {
         cmd.disabled = true
     }
-
-
 }
 
 impl Job for ProfileJob<Process> {
@@ -83,13 +83,22 @@ impl Job for ProfileJob<Process> {
     fn update(&mut self, sysinfo: &System, last_refresh: Instant) {
         let _ = self.object.update_state(sysinfo, last_refresh);
 
+        // self.profile.commands.iter_mut()
+        //     // only process enabled commands
+        //     .filter(|cmd| cmd.disabled && cmd.run_once)
+        //     .for_each(|cmd| {
+        //         cmd.disabled = false;
+        //     });
+
         
-        // dbg!(&self.object);
+        dbg!(&self.object);
+        // run commands when entering match state `exec`
         self.profile.commands.iter_mut()
             // only process enabled commands
             .filter(|cmd| !cmd.disabled)
-            .filter(|cmd| self.object.matches(cmd.condition.clone()))
+            .filter(|cmd| dbg!(self.object.matches(cmd.condition.clone())))
             .for_each(|cmd| {
+                debug!("running exec cmd");
 
                 // if we should run the exec_end command
                 // dbg!(&self.object);
@@ -102,13 +111,27 @@ impl Job for ProfileJob<Process> {
                 run_cmd(cmd, self.profile.matching.clone(), false);
             });
 
+        // run commands on exit of matching state `exec_end`
         if self.object.exiting() {
             self.profile.commands.iter_mut()
-                .filter(|cmd| !cmd.disabled)
+                // .filter(|cmd| !cmd.disabled)
                 .for_each(|cmd| {
+                    //FIX: current state should be opposite of condition
+                    //ie cond=Seen, exec_end runs when state is NotSeen after Seen
                     run_cmd(cmd, self.profile.matching.clone(), true);
                 });
         }
+
+        // if object does not match since 2 cycles, reset the run_once state
+        self.profile.commands.iter_mut()
+            .filter(|cmd| cmd.disabled && cmd.run_once)
+            .for_each(|cmd| {
+                if !self.object.matches(cmd.condition.clone()) &&
+                self.object.prev_state().is_some_and(|s| s == self.object.state()) {
+                    debug!("disabling cmd");
+                    cmd.disabled = false;
+                }
+            });
 
         // for cmd in self.profile.commands.iter_mut().filter(|c| !c.disabled) {
         //     if self.object.matches(cmd.condition.clone()) {
@@ -203,6 +226,9 @@ impl Scheduler {
 
             trace!("refresh sysinfo");
             sleep(Self::SAMPLING_RATE);
+
+            #[cfg(debug_assertions)]
+            let _  = Command::new("clear").spawn();
         }
     }
 }
