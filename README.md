@@ -125,7 +125,7 @@ follow these steps:
 
 ## License
 
-pswatch is licensed under the MIT License. See [LICENSE](LICENSE) for more
+pswatch is licensed under the AGPLv3 License. See [LICENSE](LICENSE) for more
 details.
 
 
