@@ -19,9 +19,8 @@ pub trait StateTracker {
     fn prev_state(&self) -> Option<Self::State>;
 
     /// whether we are exiting a state
-    fn exiting(&self) -> Option<Self::State> {
-        self.prev_state().filter(|_s| !matches!(self.state(), _s))
-    }
+    /// Example a Seen process becomes NotSeen
+    fn exiting(&self) -> bool;
 
     fn update_state(&mut self, info: &sysinfo::System, t_refresh: Instant) -> Self::State;
 }

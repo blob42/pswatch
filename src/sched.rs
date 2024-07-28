@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
 
-use crate::config::Profile;
+use crate::config::{CmdSchedule, Profile, ProfileMatching};
 use crate::process::{ProcLifetime, ProcState};
 use crate::state::{ConditionMatcher, StateTracker};
 
@@ -33,59 +33,113 @@ where
 
 impl ProfileJob<Process> {
     pub fn from_profile(profile: Profile) -> Self {
-        // let pattern = profile.pattern.clone();
 
         Self {
             profile: profile.clone(),
-            // object: Process::build(pattern, ProcLifetime::new()),
             object: Process::build(profile.matching.pattern, ProcLifetime::new()),
         }
     }
 }
 
+fn run_cmd(cmd: &mut CmdSchedule, matching: ProfileMatching, exec_end: bool) {
+
+    let out = if exec_end && cmd.exec_end.is_some() {
+        dbg!("run exec_end !");
+        Command::new(&cmd.exec_end.as_ref().unwrap()[0]).args(&cmd.exec_end.as_ref().unwrap()[1..]).output()
+    } else {
+        dbg!("running command !");
+        Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output()
+    };
+
+
+    match out {
+        Ok(output) => {
+
+            if !output.status.success() {
+                eprint!(
+                    "cmd error: {}",
+                    String::from_utf8_lossy(output.stderr.as_slice())
+                );
+                debug!("disabling watch for <{:?}>", matching);
+                cmd.disabled = true
+            }
+        },
+        Err(e) => {
+            error!("{:?}: failed to run cmd for: {}", matching, e);
+            cmd.disabled = true
+        }
+    }
+
+    if cmd.run_once {
+        cmd.disabled = true
+    }
+
+
+}
+
 impl Job for ProfileJob<Process> {
+
+
     fn update(&mut self, sysinfo: &System, last_refresh: Instant) {
-        // if we are entering or exiting the seen/not_seen state
-        {
-            let _ = self.object.update_state(sysinfo, last_refresh);
-            if (matches!(self.object.state(), ProcState::Seen)
-                && matches!(self.object.prev_state(), Some(ProcState::NotSeen)))
-                || (matches!(self.object.state(), ProcState::NotSeen)
-                    && matches!(self.object.prev_state(), Some(ProcState::Seen)))
-            {
-                dbg!("run exec_end !");
-                //TEST: run exec_end
-            }
+        let _ = self.object.update_state(sysinfo, last_refresh);
+
+        
+        // dbg!(&self.object);
+        self.profile.commands.iter_mut()
+            // only process enabled commands
+            .filter(|cmd| !cmd.disabled)
+            .filter(|cmd| self.object.matches(cmd.condition.clone()))
+            .for_each(|cmd| {
+
+                // if we should run the exec_end command
+                // dbg!(&self.object);
+                // let run_exec_end = (matches!(self.object.state(), ProcState::Seen)
+                //  && matches!(self.object.prev_state(), Some(ProcState::NotSeen)))
+                //     || (matches!(self.object.state(), ProcState::NotSeen)
+                //         && matches!(self.object.prev_state(), Some(ProcState::Seen)));
+
+                // dbg!(run_exec_end);
+                run_cmd(cmd, self.profile.matching.clone(), false);
+            });
+
+        if self.object.exiting() {
+            self.profile.commands.iter_mut()
+                .filter(|cmd| !cmd.disabled)
+                .for_each(|cmd| {
+                    run_cmd(cmd, self.profile.matching.clone(), true);
+                });
         }
 
-        // only process enabled commands
-        for cmd in self.profile.commands.iter_mut().filter(|c| !c.disabled) {
-            if self.object.matches(cmd.condition.clone()) {
-                //REFACT: function
-                let out = Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output();
-
-                match out {
-                    Ok(output) => {
-                        if !output.status.success() {
-                            eprint!(
-                                "cmd error: {}",
-                                String::from_utf8_lossy(output.stderr.as_slice())
-                            );
-                            debug!("disabling watch for <{:?}>", self.profile.matching);
-                            cmd.disabled = true
-                        }
-                    }
-                    Err(e) => {
-                        error!("{:?}: failed to run cmd for: {}", self.profile.matching, e);
-                        cmd.disabled = true
-                    }
-                }
-
-                if cmd.run_once {
-                    cmd.disabled = true
-                }
-            }
-        }
+        // for cmd in self.profile.commands.iter_mut().filter(|c| !c.disabled) {
+        //     if self.object.matches(cmd.condition.clone()) {
+        //         let _ = run_cmd(cmd, self.profile.matching.clone()).inspect_err(|e|{
+        //                error!("{}", e);
+        //         });
+        //         //REFACT: function
+        //         // let out = Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output();
+        //         //
+        //         // match out {
+        //         //     Ok(output) => {
+        //         //         if !output.status.success() {
+        //         //             eprint!(
+        //         //                 "cmd error: {}",
+        //         //                 String::from_utf8_lossy(output.stderr.as_slice())
+        //         //             );
+        //         //             debug!("disabling watch for <{:?}>", self.profile.matching);
+        //         //             cmd.disabled = true
+        //         //         }
+        //         //     }
+        //         //     Err(e) => {
+        //         //         error!("{:?}: failed to run cmd for: {}", self.profile.matching, e);
+        //         //         cmd.disabled = true
+        //         //     }
+        //         // }
+        //         //
+        //         // if cmd.run_once {
+        //         //     cmd.disabled = true
+        //         // }
+        //     }
+        // }
     }
 }
 

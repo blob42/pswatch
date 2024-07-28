@@ -20,7 +20,6 @@ humantime-serde = "1.1.1"
 indoc = "2.0.5"
 log = "0.4.22"
 memchr = "2.7.4"
-mock_instant = "0.5.1"
 regex = "1.10.5"
 sd-notify = "0.4.2"
 serde = { version = "1.0.203", features = ["derive"] }
@@ -30,3 +29,4 @@ xdg = "2.5.2"
 
 [dev-dependencies]
 rstest = "0.21.0"
+mock_instant = "0.5.1"

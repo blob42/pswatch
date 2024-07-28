@@ -5,7 +5,7 @@ use log::debug;
 use serde::Deserialize;
 mod profile;
 
-pub use profile::{CmdSchedule, Profile};
+pub use profile::{CmdSchedule, Profile, ProfileMatching};
 
 /// Main config for project. It is loaded from TOML or YAML in that order
 #[derive(Debug, Deserialize)]

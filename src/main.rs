@@ -20,7 +20,7 @@ use sd_notify::{notify, NotifyState};
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 /// Watch and run commands on matching processes
-///
+/// 
 /// This program watches system processes for user setup patterns and runs
 /// custom commands when a process match is found.
 #[derive(Parser, Debug)]
@@ -59,10 +59,10 @@ fn main() -> anyhow::Result<()> {
     logger.init();
 
     let program_cfg = config::read_config(cli.config).context("missing config file")?;
-    dbg!(program_cfg);
+    // dbg!(program_cfg);
 
-    // let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
-    // // //TODO: own thread
-    // scheduler.run();
+    let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
+    //TODO: own thread
+    scheduler.run();
     Ok(())
 }

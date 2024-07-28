@@ -3,28 +3,28 @@
 # [[profiles.matching]]
 # exe_path = "foo"
 
-matching = { exe_path = "foo" }
+matching = { cmdline = "foo" }
 
 
 [[profiles.commands]]
 # lifetime = {not_seen = "3m"}
-condition = {not_seen = "5s"}
-
-# one off command
-exec = ["sh", "-c", "notify-send bar"]
-
-# when exec_end is defined the schedule behaves like a toggle
-exec_end = ["sh", "-c", "notify-send 'bar end'"]
-
-[[profiles]]
-# pattern = "foo"
-# pattern_in = "cmdline"
-matching = { cmdline = "^fo?", regex = true }
-# regex = false
-
-[[profiles.commands]]
 condition = {seen = "5s"}
 
 # one off command
-exec = ["sh", "-c", "notify-send foo"]
+exec = ["sh", "-c", "notify-send 'foo seen'"]
+
+# when exec_end is defined the schedule behaves like a toggle
 exec_end = ["sh", "-c", "notify-send 'foo end'"]
+
+run_once = true
+
+# [[profiles]]
+# matching = { cmdline = "^fo?", regex = true }
+# # regex = false
+#
+# [[profiles.commands]]
+# condition = {seen = "5s"}
+#
+# # one off command
+# exec = ["sh", "-c", "notify-send foo"]
+# exec_end = ["sh", "-c", "notify-send 'foo end'"]

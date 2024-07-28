@@ -14,6 +14,8 @@ where
 
 //TODO: handle different type of patterns (String, Regex ...)
 // pub trait PatternMatcher<Pat> where Pat: String, Regex ...
+
+/// A PatternMatcher for processes. Matches a running process given a generic pattern P
 pub trait PatternMatcher<P> {
     fn matches_exe(&self, pattern: P) -> bool;
     fn matches_cmdline(&self, pattern: P) -> bool;

@@ -1,20 +1,13 @@
- # PSwatch README
+ # PSWatch 
 
- This is a program that allows you to watch system processes and run custom
- commands when specific patterns are matched. It's written in Rust for better
- performance and safety. This README will guide you through the usage of the
- program, as well as provide examples of using multiple watches within the same
- configuration file.
+pswatch is a minimalist process monitoring and task scheduler that allows you to
+watch system processes and run custom commands when specific conditions or
+patterns are matched. It also implements the `notify` signal with systemd.
 
-## Table of Contents
-
-1. [Installation](#installation)
-2. [Usage](#usage)
-3. [Configuration File](#configuration-file)
-4. [Examples with Multiple Watches](#examples-with-multiple-watches)
-5. [Troubleshooting](#troubleshooting)
-6. [Contributing](#contributing)
-7. [License](#license)
+**Features**
+- match running processes by pattern in: name, exe path or the entire command line.
+- Define multiple conditions and actions. 
+- Execute actions when conditions are met on the matched processes.
 
 ## Installation
 
@@ -31,7 +24,9 @@ The binary will be located in `target/release/pswatch`.
 
 ## Usage
 
-To use pswatch, provide the path to a configuration file as an argument:
+Pswatch requires a `TOML` based configuration file. By default it uses the
+config file under $XDG_CONFIG_DIR/pswatch/config.toml or the one provided as
+parameter.
 
 ```sh
 ./pswatch -c /path/to/config.toml
