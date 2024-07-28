@@ -83,14 +83,6 @@ impl Job for ProfileJob<Process> {
     fn update(&mut self, sysinfo: &System, last_refresh: Instant) {
         let _ = self.object.update_state(sysinfo, last_refresh);
 
-        // self.profile.commands.iter_mut()
-        //     // only process enabled commands
-        //     .filter(|cmd| cmd.disabled && cmd.run_once)
-        //     .for_each(|cmd| {
-        //         cmd.disabled = false;
-        //     });
-
-        
         dbg!(&self.object);
         // run commands when entering match state `exec`
         self.profile.commands.iter_mut()
@@ -100,24 +92,13 @@ impl Job for ProfileJob<Process> {
             .for_each(|cmd| {
                 debug!("running exec cmd");
 
-                // if we should run the exec_end command
-                // dbg!(&self.object);
-                // let run_exec_end = (matches!(self.object.state(), ProcState::Seen)
-                //  && matches!(self.object.prev_state(), Some(ProcState::NotSeen)))
-                //     || (matches!(self.object.state(), ProcState::NotSeen)
-                //         && matches!(self.object.prev_state(), Some(ProcState::Seen)));
-
-                // dbg!(run_exec_end);
                 run_cmd(cmd, self.profile.matching.clone(), false);
             });
 
         // run commands on exit of matching state `exec_end`
         if self.object.exiting() {
             self.profile.commands.iter_mut()
-                // .filter(|cmd| !cmd.disabled)
                 .for_each(|cmd| {
-                    //FIX: current state should be opposite of condition
-                    //ie cond=Seen, exec_end runs when state is NotSeen after Seen
                     if !self.object.partial_match(cmd.condition.clone()).is_some_and(|m| m) {
                         run_cmd(cmd, self.profile.matching.clone(), true);
                     }
@@ -134,37 +115,6 @@ impl Job for ProfileJob<Process> {
                     cmd.disabled = false;
                 }
             });
-
-        // for cmd in self.profile.commands.iter_mut().filter(|c| !c.disabled) {
-        //     if self.object.matches(cmd.condition.clone()) {
-        //         let _ = run_cmd(cmd, self.profile.matching.clone()).inspect_err(|e|{
-        //                error!("{}", e);
-        //         });
-        //         //REFACT: function
-        //         // let out = Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output();
-        //         //
-        //         // match out {
-        //         //     Ok(output) => {
-        //         //         if !output.status.success() {
-        //         //             eprint!(
-        //         //                 "cmd error: {}",
-        //         //                 String::from_utf8_lossy(output.stderr.as_slice())
-        //         //             );
-        //         //             debug!("disabling watch for <{:?}>", self.profile.matching);
-        //         //             cmd.disabled = true
-        //         //         }
-        //         //     }
-        //         //     Err(e) => {
-        //         //         error!("{:?}: failed to run cmd for: {}", self.profile.matching, e);
-        //         //         cmd.disabled = true
-        //         //     }
-        //         // }
-        //         //
-        //         // if cmd.run_once {
-        //         //     cmd.disabled = true
-        //         // }
-        //     }
-        // }
     }
 }
 
