@@ -287,8 +287,8 @@ mod test {
 
     #[test]
     fn match_pattern_exe() -> anyhow::Result<(), std::io::Error> {
-        let pattern = "/bin";
-        let mut target = std::process::Command::new("tests/fake_bins/proc-89MLx.sh")
+        let pattern = "fake_bins/sleep-w61Z";
+        let mut target = std::process::Command::new("tests/fake_bins/sleep-w61Z")
             .arg("300")
             .stdout(std::process::Stdio::null())
             .spawn()
