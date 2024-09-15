@@ -1,24 +1,14 @@
-use crate::{matching::PatternIn, process::ProcCondition};
+use crate::{matching::ProcessMatcher, process::ProcCondition};
+
 use serde::Deserialize;
 use std::time::Duration;
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct ProfileMatching {
-
-    /// process identification 
-    #[serde(flatten)]
-    pub pattern: PatternIn<String>,
-
-    /// Interpret `pattern` as regex
-    #[serde(default)]
-    pub regex: bool
-}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Profile {
 
     /// pattern of process name to match against
-    pub matching: ProfileMatching,
+    pub matching: ProcessMatcher,
 
     // /// Where to match the process pattern (exe, cmdline, name)
     // #[serde(default)]

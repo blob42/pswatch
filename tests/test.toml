@@ -3,7 +3,8 @@
 # [[profiles.matching]]
 # exe_path = "foo"
 
-matching = { cmdline = "foo" }
+# matching = { cmdline = "foo", regex = true }
+matching = { cmdline = "foo"}
 
 
 [[profiles.commands]]
@@ -19,13 +20,13 @@ exec_end = ["sh", "-c", "notify-send 'foo end'"]
 
 run_once = true
 
-# [[profiles]]
-# matching = { cmdline = "^fo?", regex = true }
-# # regex = false
-#
-# [[profiles.commands]]
-# condition = {seen = "5s"}
-#
-# # one off command
-# exec = ["sh", "-c", "notify-send foo"]
-# exec_end = ["sh", "-c", "notify-send 'foo end'"]
+[[profiles]]
+matching = { cmdline = "^fo?", regex = true }
+# regex = false
+
+[[profiles.commands]]
+condition = {seen = "5s"}
+
+# one off command
+exec = ["sh", "-c", "notify-send 'foo senn'"]
+exec_end = ["sh", "-c", "notify-send 'foo end'"]

@@ -10,7 +10,8 @@ use std::time::Instant;
 
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
 
-use crate::config::{CmdSchedule, Profile, ProfileMatching};
+use crate::config::{CmdSchedule, Profile};
+use crate::matching::ProcessMatcher;
 use crate::process::ProcLifetime;
 use crate::state::{ConditionMatcher, StateTracker};
 
@@ -36,12 +37,12 @@ impl ProfileJob<Process> {
 
         Self {
             profile: profile.clone(),
-            object: Process::build(profile.matching.pattern, ProcLifetime::new()),
+            object: Process::build(profile.matching, ProcLifetime::new()),
         }
     }
 }
 
-fn run_cmd(cmd: &mut CmdSchedule, matching: ProfileMatching, exec_end: bool) {
+fn run_cmd(cmd: &mut CmdSchedule, matching: ProcessMatcher, exec_end: bool) {
 
     let out = if exec_end && cmd.exec_end.is_some() {
         dbg!("run exec_end !");

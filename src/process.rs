@@ -1,10 +1,9 @@
-use core::fmt::Debug;
 use std::{fmt::Display, time::Duration};
 
-use crate::matching::{MatchBy, PatternIn};
+use crate::matching::{MatchBy, ProcessMatcher};
 use crate::state::{ConditionMatcher, StateTracker};
-use log::debug;
 use serde::Deserialize;
+use log::debug;
 use sysinfo;
 
 #[cfg(test)]
@@ -84,23 +83,24 @@ impl ProcCondition {
 
 #[derive(Debug)]
 pub struct Process {
-    pattern: PatternIn<String>,
+    matcher: ProcessMatcher,
     lifetime: ProcLifetime,
     pids: Vec<usize>,
 }
 
 impl Process {
-    pub fn build(pat: PatternIn<String>, state_matcher: ProcLifetime) -> Self {
+    pub fn build(matcher: ProcessMatcher, state_matcher: ProcLifetime) -> Self {
         Self {
-            pattern: pat,
+            matcher,
             lifetime: state_matcher,
             pids: vec![],
         }
     }
 
-    pub fn from_pattern(pat: PatternIn<String>) -> Self {
+    pub fn from_pattern(pat: impl Into<ProcessMatcher>) -> Self
+    {
         Self {
-            pattern: pat,
+            matcher: pat.into(),
             lifetime: ProcLifetime::new(),
             pids: vec![],
         }
@@ -117,11 +117,11 @@ impl Process {
                 } else {
                     self.lifetime.state_exit = false;
                 }
-                debug!("<{}>: process disappread", self.pattern);
+                debug!("<{}>: process disappread", self.matcher);
             } else {
                 self.lifetime.state_exit = false;
                 self.lifetime.prev_state = Some(ProcState::NeverSeen);
-                debug!("<{}>: never seen so far", self.pattern);
+                debug!("<{}>: never seen so far", self.matcher);
             }
             // process found
         } else {
@@ -129,10 +129,10 @@ impl Process {
                 ProcState::NeverSeen => {
                     self.lifetime.state_exit = false;
                     self.lifetime.first_seen = self.lifetime.last_refresh;
-                    debug!("<{}>: process seen first time", self.pattern);
+                    debug!("<{}>: process seen first time", self.matcher);
                 }
                 ProcState::NotSeen => {
-                    debug!("<{}>: process reappeared", self.pattern);
+                    debug!("<{}>: process reappeared", self.matcher);
                     self.lifetime.state_exit = true;
 
                     // reset first_seen
@@ -140,7 +140,7 @@ impl Process {
                 }
                 ProcState::Seen => {
                     self.lifetime.state_exit = false;
-                    debug!("<{}>: process still running", self.pattern);
+                    debug!("<{}>: process still running", self.matcher);
                 }
             }
             self.lifetime.prev_state = Some(self.lifetime.state.clone());
@@ -159,12 +159,12 @@ impl StateTracker for Process
         self.pids = info
             .processes()
             .iter()
-            // .filter(|(_, proc)| MatchBy::match_by(*proc, self.pattern.clone()))
-            .filter(|(_, proc)| proc.match_by(self.pattern.clone()))
+            // .filter(|(_, proc)| MatchBy::match_by(*proc, self.matching.pattern.clone()))
+            .filter(|(_, proc)| proc.match_by(self.matcher.clone()))
             .map(|(_, proc)| proc.pid().into())
             .collect();
 
-        debug!("<{}> detected pids: {}", self.pattern, self.pids.len());
+        debug!("<{}> detected pids: {}", self.matcher, self.pids.len());
 
         self.lifetime.prev_refresh = self.lifetime.last_refresh;
         self.lifetime.last_refresh = Some(t_refresh);
@@ -249,13 +249,13 @@ impl ConditionMatcher for ProcLifetime {
 #[allow(unused_imports)]
 mod test {
     use super::*;
-    use crate::{sched::Scheduler, state::*};
+    use crate::{sched::Scheduler, state::*, matching::PatternIn};
     use mock_instant::thread_local::MockClock;
     use sysinfo::System;
 
     #[test]
     fn default_process() {
-        let p = Process::from_pattern(PatternIn::Name("foo".into()));
+        let p = Process::from_pattern(PatternIn::Name("foo".to_string()));
         assert!(matches!(p.state(), ProcState::NeverSeen))
     }
 
@@ -270,8 +270,8 @@ mod test {
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
-        let mut p_match = Process::from_pattern(PatternIn::Name(pattern.into()));
-        let mut p_does_not_match = Process::from_pattern(PatternIn::Name("foobar_234324".into()));
+        let mut p_match = Process::from_pattern(PatternIn::Name(pattern.to_string()));
+        let mut p_does_not_match = Process::from_pattern(PatternIn::Name("foobar_234324".to_string()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
 
@@ -295,12 +295,31 @@ mod test {
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
-        let mut p_match = Process::from_pattern(PatternIn::ExePath(pattern.into()));
+        let mut p_match = Process::from_pattern(PatternIn::ExePath(pattern.to_string()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
         p_match.update_state(&sys, Instant::now());
         assert!(!p_match.pids.is_empty());
         target.kill()
+    }
+
+    #[test]
+    #[ignore]
+    fn regex_pattern_exe() -> anyhow::Result<(), std::io::Error> {
+        let pattern = r"sl??p-w61Z$"; // Example regex for files ending with .sh
+        let mut target = std::process::Command::new("tests/fake_bins/proc-89MLx.sh")
+            .arg("300")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+        let mut p_match = Process::from_pattern(PatternIn::ExePath(pattern.to_string()));
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.update_state(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
+        target.kill() // Ensure you handle the Result from kill properly
     }
 
     #[test]
@@ -313,7 +332,7 @@ mod test {
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
-        let mut p_match = Process::from_pattern(PatternIn::Cmdline(pattern.into()));
+        let mut p_match = Process::from_pattern(PatternIn::Cmdline(pattern.to_string()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
         p_match.update_state(&sys, Instant::now());
@@ -325,7 +344,7 @@ mod test {
     fn cond_seen_since() {
         MockClock::set_time(Duration::ZERO);
         let cond_seen = ProcCondition::Seen(Duration::from_secs(5));
-        let mut p = Process::from_pattern(PatternIn::Name("foo".into()));
+        let mut p = Process::from_pattern(PatternIn::Name("foo".to_string()));
         p.lifetime.last_refresh = Some(Instant::now());
 
         // no process detected initially
@@ -388,7 +407,7 @@ mod test {
     fn test_not_seen_since() {
         MockClock::set_time(Duration::ZERO);
         let cond_not_seen = ProcCondition::NotSeen(Duration::from_secs(5));
-        let mut p = Process::from_pattern(PatternIn::Name("foo".into()));
+        let mut p = Process::from_pattern(PatternIn::Name("foo".to_string()));
         p.lifetime.last_refresh = Some(Instant::now());
         let t1 = p.lifetime.last_refresh;
         p.update_inner_state();

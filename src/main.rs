@@ -59,10 +59,10 @@ fn main() -> anyhow::Result<()> {
     logger.init();
 
     let program_cfg = config::read_config(cli.config).context("missing config file")?;
-    // dbg!(program_cfg);
+    dbg!(program_cfg);
 
-    let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
+    // let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
     //TODO: own thread
-    scheduler.run();
+    // scheduler.run();
     Ok(())
 }
