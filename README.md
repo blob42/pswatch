@@ -75,7 +75,7 @@ example configuration that uses two profiles:
 ```toml
 [[profiles]]
 pattern = "bar"
-matching { name = "bar" }
+matching = { name = "bar" }
 
 [[profiles.commands]]
 condition = {not_seen = "5s"}
