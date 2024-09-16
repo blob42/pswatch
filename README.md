@@ -109,8 +109,8 @@ The command for "baz" will be run only once per process detection.
 
 ## Troubleshooting
 
-You can enable more verbose output using the `-d` flag or the `RUST_LOG=debug`
-environment variable.
+You can enable more verbose output using the `-d` flag or setting the environment
+variable to `debug` or `trace`.
 
 ## Contributing
 
