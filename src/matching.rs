@@ -63,17 +63,6 @@ pub enum PatternIn<P> {
     Name(P),
 }
 
-// DEBUG:
-// impl PatternIn<String> {
-//     pub fn as_regex(self) -> PatternIn<Regex> {
-//         match self {
-//             PatternIn::ExePath(pat) => PatternIn::ExePath(Regex::new(&pat).unwrap()),
-//             PatternIn::Cmdline(pat) => PatternIn::Cmdline(Regex::new(&pat).unwrap()),
-//             PatternIn::Name(pat) => PatternIn::Name(Regex::new(&pat).unwrap()),
-//         }
-//     }
-// }
-
 //NOTE: help from https://users.rust-lang.org/t/serde-deserializing-a-generic-enum/117560
 fn deserialize_regex_pattern<'de, D>(deserializer: D) -> Result<PatternIn<Regex>, D::Error>
 where D: Deserializer<'de>
@@ -111,46 +100,6 @@ where D: Deserializer<'de>
     }
 }
 
-// fn deserialize_regex_pattern<'de, D>(deserializer: D) -> Result<PatternIn<Regex>, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     #[derive(Deserialize, Debug)]
-//     struct Pattern {
-//         #[serde(flatten)]
-//         pattern: PatternIn<String>,
-//         regex: bool
-//     }
-//
-//     let pd: Pattern = Pattern::deserialize(deserializer).inspect_err(|e| eprintln!("PatternIn<Regex> error: {}", e))?;
-//     dbg!(&pd);
-//     if !pd.regex {
-//         Err(de::Error::custom("not a regex pattern"))
-//     } else {
-//         match pd.pattern {
-//             PatternIn::Cmdline(pat) => {
-//                 match pat.parse::<Regex>() {
-//                     Ok(regex) => Ok(PatternIn::Cmdline(regex)),
-//                     Err(err) => Err(de::Error::custom(err))
-//                 }
-//             },
-//             PatternIn::Name(pat) => {
-//                 match pat.parse::<Regex>() {
-//                     Ok(regex) => Ok(PatternIn::Name(regex)),
-//                     Err(err) => Err(de::Error::custom(err))
-//                 }
-//             },
-//             PatternIn::ExePath(pat) => {
-//                 match pat.parse::<Regex>() {
-//                     Ok(regex) => Ok(PatternIn::Name(regex)),
-//                     Err(err) => Err(de::Error::custom(err))
-//                 }
-//
-//             },
-//         }
-//     }
-// }
-
 impl MatchProcByPattern<String> for sysinfo::Process {
     fn matches_exe(&self, pattern: String) -> bool {
         let finder = memmem::Finder::new(&pattern);
@@ -171,15 +120,17 @@ impl MatchProcByPattern<String> for sysinfo::Process {
 
 impl MatchProcByPattern<Regex> for sysinfo::Process {
     fn matches_exe(&self, pattern: Regex) -> bool {
-        todo!()
+        self.exe()
+        .and_then(|exe_name| exe_name.as_os_str().to_str())
+        .is_some_and(|hay| pattern.is_match(hay))
     }
 
     fn matches_cmdline(&self, pattern: Regex) -> bool {
-        todo!()
+        pattern.is_match(&self.cmd().join(" "))
     }
 
     fn matches_name(&self, pattern: Regex) -> bool {
-        todo!()
+        pattern.is_match(self.name())
     }
 }
 

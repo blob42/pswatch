@@ -4,11 +4,13 @@ use std::time::{Duration, Instant};
 use pswatch::{process::{self, ProcCondition}, matching::PatternIn, sched::Scheduler, state::*};
 use rstest::rstest;
 use sysinfo::System;
+use serial_test::serial;
 
 
 #[rstest]
 #[case((200, 400), true)]
 #[case((200, 100), false)]
+#[serial]
 #[test]
 // cond: seen for 200ms
 // start state: seen
@@ -22,6 +24,7 @@ fn match_cond_seen(
     let test_span = Duration::from_millis(spans.1);
     let mut s = System::new();
     let mut target = std::process::Command::new("tests/fake_bins/proc-OPL6J.sh")
+        .arg("300")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -57,6 +60,7 @@ fn match_cond_seen(
 #[rstest]
 #[case((400, 500), true)]
 #[case((400, 300), false)]
+#[serial]
 #[test]
 fn match_cond_not_seen(
     #[case] spans: (u64, u64),
@@ -98,6 +102,7 @@ fn match_cond_not_seen(
 // REVIEW:
 #[case((400, 200), false)]
 #[case((200, 400), true)]
+#[serial]
 #[test]
 fn match_cond_not_seen_2(
     #[case] spans: (u64, u64),
@@ -111,6 +116,7 @@ fn match_cond_not_seen_2(
     let cond = ProcCondition::NotSeen(cond_span);
 
     let mut target = std::process::Command::new("tests/fake_bins/proc-dZWY4.sh")
+        .arg("300")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();

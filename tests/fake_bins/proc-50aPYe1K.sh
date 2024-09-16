@@ -1,4 +1,4 @@
 #!/bin/sh
 
-sleep 300
+sleep "$1"
 

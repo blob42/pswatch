@@ -251,6 +251,7 @@ mod test {
     use super::*;
     use crate::{sched::Scheduler, state::*, matching::PatternIn};
     use mock_instant::thread_local::MockClock;
+    use regex::Regex;
     use sysinfo::System;
 
     #[test]
@@ -303,18 +304,56 @@ mod test {
         target.kill()
     }
 
+    // exe path dereferences the os symlink so exe path here is the target of the symlink
     #[test]
-    #[ignore]
     fn regex_pattern_exe() -> anyhow::Result<(), std::io::Error> {
-        let pattern = r"sl??p-w61Z$"; // Example regex for files ending with .sh
-        let mut target = std::process::Command::new("tests/fake_bins/proc-89MLx.sh")
-            .arg("300")
+        let pattern = r"sl\w+-w\d{2}Z$"; // Example regex for files ending with .sh
+        let mut target = std::process::Command::new("tests/fake_bins/sleep-583a")
+            .arg("5")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap();
         std::thread::sleep(Duration::from_secs(1));
 
-        let mut p_match = Process::from_pattern(PatternIn::ExePath(pattern.to_string()));
+        let mut p_match = Process::from_pattern(PatternIn::ExePath(Regex::new(pattern).unwrap()));
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.update_state(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
+        target.kill() // Ensure you handle the Result from kill properly
+    }
+
+    // regex for process name
+    #[test]
+    fn regex_pattern_name() -> anyhow::Result<(), std::io::Error> {
+        let pattern = r"sleep-\d{3}a$"; // Example regex for files ending with .sh
+        let mut target = std::process::Command::new("tests/fake_bins/sleep-583a")
+            .arg("5")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+        let mut p_match = Process::from_pattern(PatternIn::Name(Regex::new(pattern).unwrap()));
+        let mut sys = System::new();
+        sys.refresh_specifics(Scheduler::process_refresh_specs());
+        p_match.update_state(&sys, Instant::now());
+        assert!(!p_match.pids.is_empty());
+        target.kill() // Ensure you handle the Result from kill properly
+    }
+
+    // regex for process cmdline
+    #[test]
+    fn regex_pattern_cmdline() -> anyhow::Result<(), std::io::Error> {
+        let pattern = r"sleep-\d{3}a\s5"; // Example regex for files ending with .sh
+        let mut target = std::process::Command::new("tests/fake_bins/sleep-583a")
+            .arg("5")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+
+        let mut p_match = Process::from_pattern(PatternIn::Cmdline(Regex::new(pattern).unwrap()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
         p_match.update_state(&sys, Instant::now());
