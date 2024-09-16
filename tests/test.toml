@@ -21,12 +21,12 @@ exec_end = ["sh", "-c", "notify-send 'foo end'"]
 run_once = true
 
 [[profiles]]
-matching = { cmdline = "^fo?", regex = true }
+matching = { cmdline = "^foo?", regex = true }
 # regex = false
 
 [[profiles.commands]]
 condition = {seen = "5s"}
 
 # one off command
-exec = ["sh", "-c", "notify-send 'foo senn'"]
+exec = ["sh", "-c", "notify-send 'foo seen'"]
 exec_end = ["sh", "-c", "notify-send 'foo end'"]

@@ -45,12 +45,10 @@ impl ProfileJob<Process> {
 fn run_cmd(cmd: &mut CmdSchedule, matching: ProcessMatcher, exec_end: bool) {
 
     let out = if exec_end && cmd.exec_end.is_some() {
-        dbg!("run exec_end !");
         Command::new(&cmd.exec_end.as_ref().unwrap()[0]).args(&cmd.exec_end.as_ref().unwrap()[1..]).output()
     } else if exec_end && cmd.exec_end.is_none() {
         return;
     } else {
-        dbg!("running command !");
         Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output()
     };
 
@@ -84,12 +82,12 @@ impl Job for ProfileJob<Process> {
     fn update(&mut self, sysinfo: &System, last_refresh: Instant) {
         let _ = self.object.update_state(sysinfo, last_refresh);
 
-        dbg!(&self.object);
+        trace!("{:#?}", &self.object);
         // run commands when entering match state `exec`
         self.profile.commands.iter_mut()
             // only process enabled commands
             .filter(|cmd| !cmd.disabled)
-            .filter(|cmd| dbg!(self.object.matches(cmd.condition.clone())))
+            .filter(|cmd| self.object.matches(cmd.condition.clone()))
             .for_each(|cmd| {
                 debug!("running exec cmd");
 
