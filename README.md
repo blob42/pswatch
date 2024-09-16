@@ -2,17 +2,18 @@
 
 pswatch is a minimalist process monitoring and task scheduler that allows you to
 watch system processes and run custom commands when specific conditions or
-patterns are matched. It also implements the `notify` signal with systemd.
+patterns are matched. 
 
 **Features**
-- match running processes by pattern in: name, exe path or the entire command line.
-- Define multiple conditions and actions. 
+- Process Matching: match running processes by substring or regex patterns in name, exe path or the entire command line.
+- Define conditions and actions. 
 - Execute actions when conditions are met on the matched processes.
+- Create multiple profiles for complex conditions and action sets
+- Systemd `notify` process type integration.
 
 ## Installation
 
-To install pswatch, clone the repository from GitHub and build it using
-Cargo:
+### From source
 
 ```sh
 git clone https://github.com/your-username/pswatch.git
@@ -38,7 +39,7 @@ patterns defined in the configuration file.
 ## Configuration File
 
 pswatch's behavior is configured using a TOML-formatted configuration file.
-The file should contain a list of `watches`, each containing a `pattern` (the
+The file should contain a list of `profiles`, each containing a `pattern` (the
 process name to match), a `regex` flag (set to `true` if the pattern is a
 regular expression), and a list of `commands`.
 
@@ -50,47 +51,50 @@ detection.
 Here's an example configuration file:
 
 ```toml
-[[watches]]
-pattern = "foo"
-regex = false
+[[profiles]]
+matching = { name = "foo" }
 
-[[watches.commands]]
+# command 1
+[[profiles.commands]]
 condition = {seen = "5s"}
-exec = ["sh", "-c", "notify-end action!"]
-# run_once = false # uncomment to run the command only once per process
-detection
+exec = ["sh", "-c", "notify-end 'foo action'"]
+
+# command 2 
+[[profiles.commands]]
+condition = { not_seen = "60s" }
+exec = ["sh", "-c", "notify-end 'where is foo ?'"]
+run_once = true
 ```
 
-## Examples with Multiple Watches
+## Examples with Multiple Profiles
 
-You can use multiple watches within a single configuration file to monitor
-different processes and execute commands based on their patterns. Here's an
-example configuration that uses two watches:
+You can use multiple profiles within a single configuration file to monitor
+different processes and execute commands for matched conditions. Here's an
+example configuration that uses two profiles:
 
 ```toml
-[[watches]]
+[[profiles]]
 pattern = "bar"
-regex = false
+matching { name = "bar" }
 
-[[watches.commands]]
+[[profiles.commands]]
 condition = {not_seen = "5s"}
-exec = ["sh", "-c", "echo not seen!"]
+exec = ["sh", "-c", "notify-send 'bar not seen!'"]
 
-[[watches]]
-pattern = "baz"
-regex = true
+[[profiles]]
+matching = { exe_path = ".*baz$", regex = true}
 
-[[watches.commands]]
+[[profiles.commands]]
 condition = {seen = "10s"}
-exec = ["sh", "-c", "say 'baz detected!'"]
-run_once = true # run the command only once per process detection
+exec = ["sh", "-c", "notify-end '/baz action !'"]
+run_once = true # run the command only once when a match is triggered
 ```
 
-In this example, pswatch will watch for two processes: "bar" and "baz". When
-"bar" is not seen for 5 seconds, it will execute `echo not seen!`. When "baz" (a
-regular expression) is detected, it will execute `say 'baz detected!'` after a
-delay of 10 seconds. The command for "baz" will be run only once per process
-detection.
+In this example, pswatch will watch for two processes: "bar" and "baz". It
+matches `bar` by process name and `.*baz$` by regex. When "bar" is not seen for
+5 seconds, it will execute the `exec` action. When "baz" (a regular expression)
+is detected, it will execute the corresponding `exec` after a delay of 10 seconds.
+The command for "baz" will be run only once per process detection.
 
 ## Example Scenarios
 
@@ -101,13 +105,12 @@ detection.
    - Define a watch with the desired process name and use `{not_seen = "duration"}` to specify that the command should be executed when the process has been absent for a specified duration (e.g., "5s").
 
 3. **Execute multiple commands based on different conditions**
-   - Define multiple watch configurations in the same TOML file and specify separate `condition` and `exec` settings for each. pswatch will monitor all configured watches and execute their respective commands when appropriate.
+   - Define multiple watch configurations in the same TOML file and specify separate `condition` and `exec` settings for each. pswatch will monitor all configured profiles and execute their respective commands when appropriate.
 
 ## Troubleshooting
 
-If you encounter any issues while using pswatch, please refer to the
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md) file in this repository for
-troubleshooting tips and solutions.
+You can enable more verbose output using the `-d` flag or the `RUST_LOG=debug`
+environment variable.
 
 ## Contributing
 
