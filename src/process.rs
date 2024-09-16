@@ -2,9 +2,9 @@ use std::{fmt::Display, time::Duration};
 
 use crate::matching::{MatchBy, ProcessMatcher};
 use crate::state::{ConditionMatcher, StateTracker};
+use log::{debug, log_enabled, trace};
 use serde::Deserialize;
-use log::debug;
-use sysinfo;
+use sysinfo::{self, Pid};
 
 #[cfg(test)]
 use mock_instant::thread_local::Instant;
@@ -97,8 +97,7 @@ impl Process {
         }
     }
 
-    pub fn from_pattern(pat: impl Into<ProcessMatcher>) -> Self
-    {
+    pub fn from_pattern(pat: impl Into<ProcessMatcher>) -> Self {
         Self {
             matcher: pat.into(),
             lifetime: ProcLifetime::new(),
@@ -112,11 +111,7 @@ impl Process {
             if !matches!(self.state(), ProcState::NeverSeen) {
                 self.lifetime.prev_state = Some(self.lifetime.state.clone());
                 self.lifetime.state = ProcState::NotSeen;
-                if self.lifetime.prev_state != Some(ProcState::NotSeen) {
-                    self.lifetime.state_exit = true;
-                } else {
-                    self.lifetime.state_exit = false;
-                }
+                self.lifetime.state_exit = self.lifetime.prev_state != Some(ProcState::NotSeen);
                 debug!("<{}>: process disappread", self.matcher);
             } else {
                 self.lifetime.state_exit = false;
@@ -150,8 +145,7 @@ impl Process {
     }
 }
 
-impl StateTracker for Process
-{
+impl StateTracker for Process {
     type State = ProcState;
 
     /// updates the state and return a copy of the new state
@@ -165,6 +159,14 @@ impl StateTracker for Process
             .collect();
 
         debug!("<{}> detected pids: {}", self.matcher, self.pids.len());
+        // trace matched pids
+
+        if log_enabled!(log::Level::Trace) {
+            self.pids
+                .iter()
+                .filter_map(|pid| info.processes().get(&Pid::from(*pid)))
+                .for_each(|p| trace!("- {}: \n {:#?}", p.pid(), p));
+        }
 
         self.lifetime.prev_refresh = self.lifetime.last_refresh;
         self.lifetime.last_refresh = Some(t_refresh);
@@ -184,8 +186,6 @@ impl StateTracker for Process
     fn exiting(&self) -> bool {
         self.lifetime.state_exit
     }
-
-    
 }
 
 impl ConditionMatcher for Process {
@@ -198,8 +198,6 @@ impl ConditionMatcher for Process {
     fn partial_match(&self, c: Self::Condition) -> Option<bool> {
         self.lifetime.partial_match(c)
     }
-
-    
 }
 
 impl ConditionMatcher for ProcLifetime {
@@ -235,12 +233,11 @@ impl ConditionMatcher for ProcLifetime {
 
     fn partial_match(&self, cond: Self::Condition) -> Option<bool> {
         match cond {
-            ProcCondition::Seen(_) => {
-                Some(matches!(self.state, ProcState::Seen))
-            }
-            ProcCondition::NotSeen(_) => {
-                Some(matches!(self.state, ProcState::NotSeen | ProcState::NeverSeen))
-            }
+            ProcCondition::Seen(_) => Some(matches!(self.state, ProcState::Seen)),
+            ProcCondition::NotSeen(_) => Some(matches!(
+                self.state,
+                ProcState::NotSeen | ProcState::NeverSeen
+            )),
         }
     }
 }
@@ -249,7 +246,7 @@ impl ConditionMatcher for ProcLifetime {
 #[allow(unused_imports)]
 mod test {
     use super::*;
-    use crate::{sched::Scheduler, state::*, matching::PatternIn};
+    use crate::{matching::PatternIn, sched::Scheduler, state::*};
     use mock_instant::thread_local::MockClock;
     use regex::Regex;
     use sysinfo::System;
@@ -272,7 +269,8 @@ mod test {
         std::thread::sleep(Duration::from_secs(1));
 
         let mut p_match = Process::from_pattern(PatternIn::Name(pattern.to_string()));
-        let mut p_does_not_match = Process::from_pattern(PatternIn::Name("foobar_234324".to_string()));
+        let mut p_does_not_match =
+            Process::from_pattern(PatternIn::Name("foobar_234324".to_string()));
         let mut sys = System::new();
         sys.refresh_specifics(Scheduler::process_refresh_specs());
 
