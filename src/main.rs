@@ -2,6 +2,7 @@
 //! patterns are matched. This application is designed for managing and automating tasks based on
 //! the presence or absence of certain processes in your system.
 
+//DEBUG:
 #![allow(dead_code, unused_variables, unused_imports)]
 mod utils;
 

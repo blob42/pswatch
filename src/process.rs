@@ -242,6 +242,7 @@ impl ConditionMatcher for ProcLifetime {
     }
 }
 
+//DEBUG:
 #[cfg(test)]
 #[allow(unused_imports)]
 mod test {
