@@ -1,4 +1,9 @@
-[ ] match multiple patterns
+[ ] cli commands: manage, add, delete ...
+[ ] process detection helpers
+   - help user target specific process
+   - help user generate profile 
+[ ] profile names
+[x] match multiple patterns: handled by regex
 [x] cmd exec:
     [x] repeat on cmd failure
     [x] disable profile on cmd failure
