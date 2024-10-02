@@ -52,8 +52,19 @@ mod tests {
             condition = {seen = "10s"}
             exec = ["echo", "still there"]
 
+            ###
+
             [[profiles]]
             matching = { name = "foo_not_seen" }
+
+            [[profiles.commands]]
+            condition = {not_seen = "5s"}
+            exec = ["echo", "not seen"]
+
+            ###
+
+            [[profiles]]
+            matching = { exe_path = "b.n.*sh", regex = true }
 
             [[profiles.commands]]
             condition = {not_seen = "5s"}
@@ -62,8 +73,8 @@ mod tests {
         "###};
 
         let c = parse_config(config)?;
-        assert_eq!(c.profiles.len(), 2);
-        assert_eq!(c.profiles[0].commands.len(), 2);
+        assert_eq!(c.profiles.len(), 3, "non matching number of declared profiles");
+        assert_eq!(c.profiles[0].commands.len(), 2, "non matching number of commands on profile1");
         Ok(())
     }
 }
