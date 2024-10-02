@@ -16,6 +16,7 @@ use std::{
 
 use anyhow::{bail, Context};
 use clap::Parser;
+use log::trace;
 use pswatch::{config, sched::Scheduler};
 use sd_notify::{notify, NotifyState};
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
@@ -41,26 +42,30 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let mut logger = env_logger::builder();
-    logger.filter_level(log::LevelFilter::Info);
-    match cli.debug {
-        0 => {
-            logger.filter_level(log::LevelFilter::Warn);
+    if let Ok(envlog) = std::env::var("RUST_LOG") {
+        println!("RUST_LOG={}", envlog);
+    } else {
+        logger.filter_level(log::LevelFilter::Info);
+        match cli.debug {
+            0 => {
+                logger.filter_level(log::LevelFilter::Warn);
+            }
+            1 => {
+                logger.filter_level(log::LevelFilter::Info);
+            }
+            2 => {
+                logger.filter_level(log::LevelFilter::Debug);
+            }
+            3 => {
+                logger.filter_level(log::LevelFilter::Trace);
+            }
+            _ => {}
         }
-        1 => {
-            logger.filter_level(log::LevelFilter::Info);
-        }
-        2 => {
-            logger.filter_level(log::LevelFilter::Debug);
-        }
-        3 => {
-            logger.filter_level(log::LevelFilter::Trace);
-        }
-        _ => {}
     }
     logger.init();
 
     let program_cfg = config::read_config(cli.config).context("missing config file")?;
-    // dbg!(program_cfg);
+    trace!("CONFIG: \n{:#?}", program_cfg);
 
     let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
     //TODO: own thread
