@@ -2,7 +2,7 @@ use std::{fmt::Display, os::unix::ffi::OsStrExt};
 
 use memchr::memmem;
 use regex::Regex;
-use serde::{de, Deserialize, Deserializer};
+use serde::{de, Deserialize};
 
 // TODO!:
 /// Match a process by a given `Criteria'
@@ -23,11 +23,56 @@ trait MatchProcByPattern<P> {
     fn matches_name(&self, pattern: P) -> bool;
 }
 
+// Raw structures for deseiralizing matchers
 #[derive(Deserialize, Debug, Clone)]
-#[serde(untagged)]
+#[serde(rename_all = "snake_case")]
+enum PatternInRaw {
+    ExePath(String),
+    Cmdline(String),
+    Name(String)
+}
+
+#[derive(Deserialize, Clone, Debug)]
+struct ProcessMatcherRaw {
+    #[serde(flatten)]
+    pattern: PatternInRaw,
+    regex: Option<bool>
+}
+
+//NOTE: help from https://users.rust-lang.org/t/serde-deserializing-a-generic-enum/117560
+impl TryFrom<ProcessMatcherRaw> for ProcessMatcher {
+    type Error =  de::value::Error;
+
+    fn try_from(raw: ProcessMatcherRaw) -> Result<Self, Self::Error> {
+        if raw.regex.is_some_and(|x| x)  {
+            let pattern = convert_pattern(raw.pattern, parse_regex)?;
+            Ok(ProcessMatcher::RegexPattern(pattern))
+        } else {
+            let pattern = convert_pattern(raw.pattern, Ok)?;
+            Ok(ProcessMatcher::StringPattern(pattern))
+        }
+    }
+}
+
+fn convert_pattern<F, P, E>(raw: PatternInRaw, convert: F) -> Result<PatternIn<P>, E>
+where
+    F: FnOnce(String) -> Result<P, E>
+{
+    Ok(match raw {
+        PatternInRaw::ExePath(s) => PatternIn::ExePath(convert(s)?),
+        PatternInRaw::Cmdline(s) => PatternIn::Cmdline(convert(s)?),
+        PatternInRaw::Name(s) => PatternIn::Name(convert(s)?),
+    })
+}
+
+fn parse_regex(raw: String) -> Result<Regex, de::value::Error> {
+    raw.parse::<Regex>().map_err(de::Error::custom)
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(try_from = "ProcessMatcherRaw")]
 pub enum ProcessMatcher {
     StringPattern(PatternIn<String>),
-    #[serde(deserialize_with = "deserialize_regex_pattern")]
     RegexPattern(PatternIn<Regex>)
 }
 
@@ -56,49 +101,12 @@ impl Display for ProcessMatcher {
 
 
 #[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
 pub enum PatternIn<P> {
     ExePath(P),
     Cmdline(P),
     Name(P),
 }
 
-//NOTE: help from https://users.rust-lang.org/t/serde-deserializing-a-generic-enum/117560
-fn deserialize_regex_pattern<'de, D>(deserializer: D) -> Result<PatternIn<Regex>, D::Error>
-where D: Deserializer<'de>
-{
-    let mut table = toml::Table::deserialize(deserializer)?;
-
-    let regex = table.remove("regex")
-        .and_then(|regex| regex.as_bool())
-        .unwrap_or_default();
-
-    if !regex {
-        Err(de::Error::custom("not a regex pattern"))
-    } else {
-
-        // Since `Regex` does not implement the `Deserialize` trait, we first need to convert the `table` into a `PatternIn<String>`
-        table
-        .try_into::<PatternIn<String>>()
-        .map_err(|err| {
-                regex::Error::Syntax(format!(
-                    "could not convert pattern into a `PatternIn<String>`: {}", err
-                ))
-        })
-        // Then, we can map the `PatternIn<String>` into a `PatternIn<Regex>` and return it.
-        .and_then(|pattern| {
-            match pattern {
-                PatternIn::Name(pat) => pat.parse::<Regex>().map(PatternIn::Name) ,
-                PatternIn::ExePath(pat) => pat.parse::<Regex>().map(PatternIn::ExePath),
-                PatternIn::Cmdline(pat) => pat.parse::<Regex>().map(PatternIn::Cmdline),
-            }
-        })
-        .map_err(|err| {
-            de::Error::custom(format!("could not convert pattern into a regex: {}", err))
-
-        })
-    }
-}
 
 impl MatchProcByPattern<String> for sysinfo::Process {
     fn matches_exe(&self, pattern: String) -> bool {
