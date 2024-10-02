@@ -10,16 +10,9 @@ pub struct Profile {
     /// pattern of process name to match against
     pub matching: ProcessMatcher,
 
-    // /// Where to match the process pattern (exe, cmdline, name)
-    // #[serde(default)]
-
     // pub pattern_in: PatternIn,
     /// List of commands to run when condition is met
     pub commands: Vec<CmdSchedule>,
-
-    /// Interpret `pattern` as regex
-    // #[serde(default)]
-    // pub regex: bool,
 
     //TODO:
     // pub match_by:

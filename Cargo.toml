@@ -5,9 +5,9 @@ edition = "2021"
 default-run = "pswatch"
 
 
-[[bin]]
+[[example]]
 name = "condition"
-path = "src/bin/proto_condition.rs"
+path = "examples/proto_condition.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

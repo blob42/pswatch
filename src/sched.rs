@@ -44,10 +44,12 @@ impl ProfileJob<Process> {
 
 fn run_cmd(cmd: &mut CmdSchedule, matching: ProcessMatcher, exec_end: bool) {
 
+    // handle end exec
     let out = if exec_end && cmd.exec_end.is_some() {
         Command::new(&cmd.exec_end.as_ref().unwrap()[0]).args(&cmd.exec_end.as_ref().unwrap()[1..]).output()
     } else if exec_end && cmd.exec_end.is_none() {
         return;
+        // run normal execs
     } else {
         Command::new(&cmd.exec[0]).args(&cmd.exec[1..]).output()
     };
