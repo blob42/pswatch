@@ -13,6 +13,10 @@ patterns are matched.
 
 ## Installation
 
+### From Crates.io
+
+`cargo install pswatch`
+
 ### From source
 
 ```sh
@@ -26,7 +30,7 @@ The binary will be located in `target/release/pswatch`.
 ## Usage
 
 Pswatch requires a `TOML` based configuration file. By default it uses the
-config file under $XDG_CONFIG_DIR/pswatch/config.toml or the one provided as
+config file under `$XDG_CONFIG_DIR/pswatch/config.toml` or the one provided as
 parameter.
 
 ```sh

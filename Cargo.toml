@@ -1,5 +1,11 @@
 [package]
 name = "pswatch"
+license = "AGPL-3.0-or-later"
+repository = "https://git.blob42.xyz/blob42/pswatch"
+readme = "README.md"
+keywords = ["process", "monitoring", "scheduler", "timer", "resource-control"]
+categories = ["command-line-utilities", "config", "os"]
+description = "minimalist process monitoring and task scheduler"
 version = "0.1.0"
 edition = "2021"
 default-run = "pswatch"
