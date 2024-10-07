@@ -66,6 +66,27 @@ exec = ["sh", "-c", "notify-end 'where is foo ?'"]
 run_once = true
 ```
 
+## Example: Toggle Power Saving 
+
+Here is a more realistic example that toggles the CPU turbo mode or power saving when  
+a compilation job is detected: 
+```toml
+[[profiles]]
+
+# matches common compilers for C,C++ and Rust
+matching = { name = "cc1.*|^cc$|gcc$|c\\+\\+$|c89$|c99$|cpp$|g\\+\\+$|rustc$", regex = true }
+
+[[profiles.commands]]
+condition = {seen = "3s"}
+
+# command to execute when condition is met
+exec = ["sh", "-c", "enable_turbo"]
+
+# when exec_end is defined the schedule behaves like a toggle
+# command is executed when exiting the condition
+exec_end = ["sh", "-c",  "disable_turbo"]
+```
+
 ## Examples with Multiple Profiles
 
 You can use multiple profiles within a single configuration file to monitor
@@ -96,6 +117,7 @@ matches `bar` by process name and `.*baz$` by regex. When "bar" is not seen for
 is detected, it will execute the corresponding `exec` after a delay of 10 seconds.
 The command for "baz" will be run only once per process detection.
 
+
 ## Example Scenarios
 
 1. **Execute a command when a specific process is seen for a certain duration**
@@ -106,6 +128,23 @@ The command for "baz" will be run only once per process detection.
 
 3. **Execute multiple commands based on different conditions**
    - Define multiple watch configurations in the same TOML file and specify separate `condition` and `exec` settings for each. pswatch will monitor all configured profiles and execute their respective commands when appropriate.
+
+## Systemd User Unit
+```ini
+[Unit]
+Description=pswatch process watcher
+
+[Service]
+Type=notify
+ExecStart=%h/.cargo/bin/pswatch
+Restart=on-failure
+; Use this to enable debug or trace
+;Environment=RUST_LOG=debug
+
+[Install]
+WantedBy=default.target
+
+```
 
 ## Troubleshooting
 
