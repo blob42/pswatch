@@ -22,10 +22,8 @@ patterns are matched.
 ```sh
 git clone https://github.com/your-username/pswatch.git
 cd pswatch
-cargo build --release
+cargo install --path .
 ```
-
-The binary will be located in `target/release/pswatch`.
 
 ## Usage
 
@@ -42,10 +40,10 @@ patterns defined in the configuration file.
 
 ## Configuration File
 
-pswatch's behavior is configured using a TOML-formatted configuration file.
-The file should contain a list of `profiles`, each containing a `pattern` (the
-process name to match), a `regex` flag (set to `true` if the pattern is a
-regular expression), and a list of `commands`.
+pswatch's behavior is configured using a TOML-formatted configuration file. The
+file should contain a list of `profiles`, each containing a `matching` directive
+(the process to match), an (optional) `regex` flag (set to `true` if the
+pattern is a regular expression), and a list of `commands`.
 
 Each command contains a condition (either `seen` or `not_seen` with a duration)
 and an array of shell commands (`exec`) to execute when the condition is met. An
@@ -61,12 +59,12 @@ matching = { name = "foo" }
 # command 1
 [[profiles.commands]]
 condition = {seen = "5s"}
-exec = ["sh", "-c", "notify-end 'foo action'"]
+exec = ["sh", "-c", "notify-send psw 'foo action'"]
 
 # command 2 
 [[profiles.commands]]
 condition = { not_seen = "60s" }
-exec = ["sh", "-c", "notify-end 'where is foo ?'"]
+exec = ["sh", "-c", "notify-send psw 'where is foo ?'"]
 run_once = true
 ```
 
@@ -78,7 +76,7 @@ a compilation job is detected:
 [[profiles]]
 
 # matches common compilers for C,C++ and Rust
-matching = { name = "cc1.*|^cc$|gcc$|c\\+\\+$|c89$|c99$|cpp$|g\\+\\+$|rustc$", regex = true }
+matching = { name = 'cc1.*|^cc$|gcc$|c\+\+$|c89$|c99$|cpp$|g\+\+$|rustc$', regex = true }
 
 [[profiles.commands]]
 condition = {seen = "3s"}
@@ -100,26 +98,43 @@ example configuration that uses two profiles:
 ```toml
 [[profiles]]
 pattern = "bar"
+
+# matches the process name
 matching = { name = "bar" }
 
 [[profiles.commands]]
 condition = {not_seen = "5s"}
-exec = ["sh", "-c", "notify-send 'bar not seen!'"]
+exec = ["sh", "-c", "notify-send psw 'bar not seen!'"]
 
 [[profiles]]
-matching = { exe_path = ".*baz$", regex = true}
+# matches the full executable path
+matching = { exe_path = '.*baz$', regex = true}
 
 [[profiles.commands]]
 condition = {seen = "10s"}
-exec = ["sh", "-c", "notify-end '/baz action !'"]
+exec = ["sh", "-c", "notify-send psw '/baz action !'"]
 run_once = true # run the command only once when a match is triggered
+
+
+[[profiles]]
+# matches the command line
+matching = { cmdline = '\-buz.*', regex = true}
+
+[[profiles.commands]]
+condition = {seen = "10s"}
+exec = ["sh", "-c", "notify-send psw 'someproc -buz action !'"]
+
 ```
 
-In this example, pswatch will watch for two processes: "bar" and "baz". It
-matches `bar` by process name and `.*baz$` by regex. When "bar" is not seen for
-5 seconds, it will execute the `exec` action. When "baz" (a regular expression)
-is detected, it will execute the corresponding `exec` after a delay of 10 seconds.
-The command for "baz" will be run only once per process detection.
+In this example, pswatch will watch for two processes: "bar" and "baz". 
+
+- It matches `bar` by process name (simple string).
+- Matches `.*baz$` and `\-buz.*` by a regex pattern of the executable path and
+command line respectively.
+- When "bar" is not seen for 5 seconds, it will execute the `exec` action.
+- When "baz" (a regular expression) is detected, it will execute the
+corresponding `exec` after a delay of 10 seconds.
+- The command for "baz" will be run only once per process detection.
 
 
 ## Example Scenarios
@@ -164,10 +179,10 @@ follow these steps:
 2. Clone your fork to your local machine: `git clone
    https://github.com/your-username/pswatch.git`.
    3. Create a new branch for your changes: `git checkout -b my-feature`.
-   4. Make your changes and commit them with descriptive messages: `git commit
-      -am 'Add some feature'`.
-      5. Push your branch to your GitHub fork: `git push origin my-feature`.
-      6. Submit a pull request from your GitHub fork to the main repository.
+   4. Make your changes and commit them with descriptive messages:
+      `git commit -am 'Add some feature'`.
+   5. Push your branch: `git push origin my-feature`.
+   6. Submit a pull request from your GitHub fork to the main repository.
 
 ## License
 

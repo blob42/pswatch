@@ -21,7 +21,7 @@ exec_end = ["sh", "-c", "notify-send 'foo end'"]
 run_once = true
 
 [[profiles]]
-matching = { cmdline = "^bar.*", regex = true }
+matching = { cmdline = '^bar.*', regex = true }
 # regex = false
 
 [[profiles.commands]]
@@ -30,3 +30,14 @@ condition = {seen = "5s"}
 # one off command
 exec = ["sh", "-c", "notify-send 'bar seen'"]
 exec_end = ["sh", "-c", "notify-send 'bar end'"]
+
+[[profiles]]
+matching = { cmdline = '\-baz.*', regex = true }
+# regex = false
+
+[[profiles.commands]]
+condition = {seen = "5s"}
+
+# one off command
+exec = ["sh", "-c", "notify-send pswatch 'baz seen'"]
+#exec_end = ["sh", "-c", "notify-send '-bar end'"]
