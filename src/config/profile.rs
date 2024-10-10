@@ -14,8 +14,6 @@ pub struct Profile {
     /// List of commands to run when condition is met
     pub commands: Vec<CmdSchedule>,
 
-    //TODO:
-    // pub match_by:
     /// process watch sampling rate
     #[serde(default = "default_watch_interval", with = "humantime_serde")]
     pub interval: Duration,

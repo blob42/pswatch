@@ -4,7 +4,7 @@ use crate::matching::{MatchBy, ProcessMatcher};
 use crate::state::{ConditionMatcher, StateTracker};
 use log::{debug, log_enabled, trace};
 use serde::Deserialize;
-use sysinfo::{self, Pid};
+use sysinfo::{self, Pid, ProcessStatus};
 
 #[cfg(test)]
 use mock_instant::thread_local::Instant;
@@ -155,6 +155,12 @@ impl StateTracker for Process {
             .iter()
             // .filter(|(_, proc)| MatchBy::match_by(*proc, self.matching.pattern.clone()))
             .filter(|(_, proc)| proc.match_by(self.matcher.clone()))
+            // .inspect(|(pid, proc)| debug!("[{}] status: {}", pid, (proc.status()))) 
+
+            // filter out non active and dead processes
+            .filter(|(_, proc)| {
+                !matches!(proc.status(), ProcessStatus::Stop | ProcessStatus::Dead | ProcessStatus::Zombie)
+            })
             .map(|(_, proc)| proc.pid().into())
             .collect();
 
