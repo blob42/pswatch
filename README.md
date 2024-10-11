@@ -27,9 +27,7 @@ cargo install --path .
 
 ## Usage
 
-Pswatch requires a `TOML` based configuration file. By default it uses the
-config file under `$XDG_CONFIG_DIR/pswatch/config.toml` or the one provided as
-parameter.
+Pswatch requires a `TOML` based configuration file. By default it uses the config file under `$XDG_CONFIG_DIR/pswatch/config.toml` or the one provided as parameter.
 
 ```sh
 ./pswatch -c /path/to/config.toml
@@ -70,8 +68,7 @@ run_once = true
 
 ## Example: Toggle Power Saving 
 
-Here is a more realistic example that toggles the CPU turbo mode or power saving when  
-a compilation job is detected: 
+Here is a more realistic example that toggles the CPU turbo mode or power saving when a compilation job is detected: 
 ```toml
 [[profiles]]
 
@@ -91,9 +88,8 @@ exec_end = ["sh", "-c",  "disable_turbo"]
 
 ## Examples with Multiple Profiles
 
-You can use multiple profiles within a single configuration file to monitor
-different processes and execute commands for matched conditions. Here's an
-example configuration that uses two profiles:
+You can use multiple profiles within a single configuration file to monitor different processes and execute commands for matched conditions.
+Here's an example configuration that uses two profiles:
 
 ```toml
 [[profiles]]
@@ -126,7 +122,7 @@ exec = ["sh", "-c", "notify-send psw 'someproc -buz action !'"]
 
 ```
 
-In this example, pswatch will watch for two processes: "bar" and "baz". 
+In this example, pswatch will watch for three processes: "bar", "baz" and "buz". 
 
 - It matches `bar` by process name (simple string).
 - Matches `.*baz$` and `\-buz.*` by a regex pattern of the executable path and
@@ -167,13 +163,11 @@ WantedBy=default.target
 
 ## Troubleshooting
 
-You can enable more verbose output using the `-d` flag or setting the environment
-variable to `debug` or `trace`.
+You can enable more verbose output using the `-d` flag or setting the environment variable to `debug` or `trace`.
 
 ## Contributing
 
-Contributions are welcome! If you'd like to contribute to pswatch, please
-follow these steps:
+Contributions are welcome ! If you'd like to contribute, please follow these steps:
 
 1. Fork the repository on GitHub.
 2. Clone your fork to your local machine: `git clone
@@ -186,7 +180,8 @@ follow these steps:
 
 ## License
 
-pswatch is licensed under the AGPLv3 License. See [LICENSE](LICENSE) for more
-details.
+pswatch is licensed under the AGPLv3 License.
+
+See [LICENSE](LICENSE) for more details.
 
 
