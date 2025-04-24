@@ -86,6 +86,26 @@ exec = ["sh", "-c", "enable_turbo"]
 exec_end = ["sh", "-c",  "disable_turbo"]
 ```
 
+## Example: dynamic nvidia-smi power profile for compute workloads
+
+```toml
+[[profiles]]
+
+matching = { cmdline = "llama.cpp|ollama runner|localai", regex = true}
+
+[[profiles.commands]]
+
+condition = {seen = "1s"}
+exec = [ "sh", "-c", "sudo nvidia-smi -pl 280" ]
+
+
+[[profiles.commands]]
+
+condition = {not_seen = "30s"}
+
+exec = [ "sh", "-c", "sudo nvidia-smi -pl 100"]
+```
+
 ## Examples with Multiple Profiles
 
 You can use multiple profiles within a single configuration file to monitor different processes and execute commands for matched conditions.
