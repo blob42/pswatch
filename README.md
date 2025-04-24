@@ -20,7 +20,7 @@ patterns are matched.
 ### From source
 
 ```sh
-git clone https://github.com/your-username/pswatch.git
+git clone https://github.com/blob42/pswatch.git
 cd pswatch
 cargo install --path .
 ```
