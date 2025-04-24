@@ -149,7 +149,7 @@ impl<P> Display for PatternIn<P> where P: Display {
                 write!(f, "exe_path[{}]", p)
             },
             PatternIn::Cmdline(p) => {
-                write!(f, "cmd_line[{}]", p)
+                write!(f, "cmdline[{}]", p)
             },
             PatternIn::Name(p) => {
                 write!(f, "name[{}]", p)
