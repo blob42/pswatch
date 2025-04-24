@@ -1,0 +1,48 @@
+############
+# performance programs
+############
+[[profiles]]
+
+matching = { name = '^7z.*|^rar.*|^zip.*|^tar.*|^gzip.*|^bzip2.*|^md5.*|^sha1.*|^sha256.*|^sha512.*|^bcrypt.*|^scrypt.*|^argon2.*|^whirlpool.*|^ripemd160.*', regex = true }
+
+[[profiles.commands]]
+condition = {seen = "3s"}
+
+# one off command
+exec = ["sh", "-c", "performacne"]
+
+# when exec_end is defined the schedule behaves like a toggle
+# cmd is executed when exiting condition
+exec_end = ["sh", "-c",  "powersaving"]
+
+############
+# build jobs
+############
+
+[[profiles]]
+
+matching = { name = 'cc1.*|^cc$|gcc$|c\+\+$|c89$|c99$|cpp$|g\+\+$|rustc$|cargo$|go$|^ld$|^mold$', regex = true }
+
+
+[[profiles.commands]]
+condition = {seen = "3s"}
+exec = ["sh", "-c", "performance"]
+exec_end = ["sh", "-c",  "powersaving"]
+
+#############
+# Nvidia SMI power profile / AI 
+#############
+[[profiles]]
+
+matching = { cmdline = "ollama runner", regex = true}
+
+[[profiles.commands]]
+
+condition = {seen = "1s"}
+exec = [ "sh", "-c", "doas nvidia-smi -pl 280" ]
+
+
+[[profiles.commands]]
+
+condition = {not_seen = "30s"}
+exec = [ "sh", "-c", "doas nvidia-smi -pl 100"]
