@@ -1,5 +1,7 @@
  # PSWatch 
 
+Run custom commands when defined system conditions are met.
+
 pswatch is a minimalist process monitoring and task scheduler that allows you to
 watch system processes and run custom commands when specific conditions or
 patterns are matched. 

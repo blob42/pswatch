@@ -38,7 +38,6 @@ struct Cli {
 }
 
 fn main() -> anyhow::Result<()> {
-    let _ = sd_notify::notify(true, &[NotifyState::Ready]);
     let cli = Cli::parse();
 
     let mut logger = env_logger::builder();
@@ -68,6 +67,7 @@ fn main() -> anyhow::Result<()> {
     trace!("CONFIG: \n{:#?}", program_cfg);
 
     let mut scheduler = Scheduler::from_profiles(program_cfg.profiles);
+    let _ = sd_notify::notify(true, &[NotifyState::Ready]);
     //TODO: own thread
     scheduler.run();
     Ok(())

@@ -6,7 +6,7 @@ readme = "README.md"
 keywords = ["process", "monitoring", "scheduler", "timer", "resource-control"]
 categories = ["command-line-utilities", "config", "os"]
 description = "minimalist process monitoring and task scheduler"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 default-run = "pswatch"
 
