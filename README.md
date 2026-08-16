@@ -5,6 +5,9 @@ Run custom commands when defined system conditions are met.
 pswatch is a minimalist process monitoring and task scheduler that allows you to
 watch system processes and run custom commands when specific conditions or
 patterns are matched. 
+## Screenshot
+
+![pswatch in action](assets/screenshot.svg)
 
 **Features**
 - Process Matching: match running processes by substring or regex patterns in name, exe path or the entire command line.
