@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="240" viewBox="0 0 720 240">
-  <rect width="720" height="240" rx="12" fill="#0d1117"/>
-  <rect x="16" y="16" width="688" height="40" rx="8" fill="#161b22"/>
-  <text x="32" y="42" font-family="monospace" font-size="16" fill="#e6edf3">$ pswatch -c config.toml</text>
-  <text x="32" y="92" font-family="monospace" font-size="16" fill="#e6edf3">INFO: watching for processes (interval: 5s)</text>
-  <text x="32" y="122" font-family="monospace" font-size="16" fill="#e6edf3">INFO: matching cmdline[foo] pids: 1</text>
-  <text x="32" y="152" font-family="monospace" font-size="16" fill="#e6edf3">INFO: running exec cmd: notify-send pswatch 'foo seen'</text>
-  <text x="32" y="182" font-family="monospace" font-size="16" fill="#8b949e">... repeats on every matching refresh ...</text>
-</svg>
